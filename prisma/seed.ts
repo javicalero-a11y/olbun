@@ -13,7 +13,11 @@ import { PrismaClient } from '@prisma/client';
  * La empresa es ficticia a propósito: los datos de demostración no deben
  * suplantar a ninguna compañía real.
  */
-const prisma = new PrismaClient();
+// The seed creates organisations, which the RLS policies reject for the
+// application role. Seeds are an owner-role operation, like migrations.
+const prisma = new PrismaClient({
+  datasourceUrl: process.env['DIRECT_DATABASE_URL'] ?? process.env['DATABASE_URL'],
+});
 
 const DEMO_ORG_SLUG = 'servicios-guadaira';
 

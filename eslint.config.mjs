@@ -67,14 +67,19 @@ export default tseslint.config(
     files: ['**/*.ts', '**/*.tsx'],
     ignores: ['lib/db/**', 'prisma/**', 'tests/**'],
     rules: {
-      'no-restricted-imports': [
+      // The typescript-eslint variant so that `allowTypeImports` is available:
+      // importing the generated *types* (Role, MembershipStatus) cannot bypass
+      // tenancy, only the runtime client can.
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           paths: [
             {
               name: '@prisma/client',
+              allowTypeImports: true,
               message:
-                'Import from the tenant-scoped data access layer in lib/db instead. The raw Prisma client bypasses organisation filtering (SPEC §7.2).',
+                'Import from the tenant-scoped data access layer in lib/db instead. The raw Prisma client bypasses organisation filtering (SPEC §7.2). Type-only imports are allowed.',
             },
             {
               name: '@/lib/db/prisma',

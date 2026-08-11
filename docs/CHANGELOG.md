@@ -6,6 +6,33 @@ SPEC §12.
 
 ## [Unreleased]
 
+### M1 — Identity & tenancy (en curso)
+
+#### Added
+
+- Identity schema: `User`, `Membership`, `Team`, `TeamMember`, `AccessGrant`,
+  plus the Auth.js adapter models. Roles reflect the Spanish personas
+  (GESTOR_CONTRATO, JURIDICO, LETRADO_EXTERNO, RRHH, ADMIN_CONTABLE…).
+- Permission matrix in `lib/auth/permissions.ts` — 80 permissions across the
+  whole domain, mapped per role in one place, never compared inline.
+- `can()` / `assertCan()` / `filterAuthorised()`: pure, injectable clock,
+  scope-aware. Time-boxed `AccessGrant`s drive external-counsel access.
+- **848 generated permission tests** — every role × every permission, plus
+  in-scope/out-of-scope, cross-tenant, membership status and grant expiry.
+- Tenant-scoped data access layer that rewrites `where` and stamps
+  `organisationId` on writes, so application code cannot issue an unfiltered
+  query.
+- Row-level security on every tenant-owned table, enforced through a dedicated
+  non-superuser role. Verified: scoped reads see only their tenant, unscoped
+  reads see nothing, cross-tenant writes are rejected by Postgres.
+- Case-insensitive unique index on `users.email`.
+- ADR 0005 on the three isolation layers and the two-role split.
+
+#### Deferred to the next chunk of M1
+
+- Auth.js wiring (sign-up, sign-in, magic link), MFA enrolment, invitation
+  flow, organisation switching, and the settings UI.
+
 ### M0 — Foundation
 
 #### Added

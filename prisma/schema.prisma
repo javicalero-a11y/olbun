@@ -2,22 +2,24 @@
 //
 // Conventions (see AGENTS.md and SPEC §4):
 //   * Primary keys are cuid2.
-//   * Every tenant-owned model carries organisationId + the audit columns
-//     (createdAt, updatedAt, createdById, updatedById, deletedAt, deletedById)
-//     and a composite index beginning with organisationId.
-//   * Append-only models (AuditEvent, RiskAssessment, DocumentVersion) are
-//     exempt from updatedAt/deletedAt — see docs/adr/0004-immutable-models.md.
+//   * Domain nouns stay in Spanish where the Spanish word is the legal term of
+//     art (Expediente, Plazo, Notificacion). Generic infrastructure is English.
+//   * Every tenant-owned model carries organisationId + the audit columns and a
+//     composite index beginning with organisationId.
+//   * Append-only models are exempt from updatedAt/deletedAt — see ADR 0003.
 //
-// M0 defines only Organisation, the tenancy root. Identity (User, Membership)
-// lands in M1.
+// M0: Organisation. M1: identity, membership, teams, scoped access.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // The application connects as a non-superuser so row-level security applies.
+  url       = env("DATABASE_URL")
+  // Migrations and seeds need the owner role, which RLS does not constrain.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 /// Commercial plan for an organisation. Placeholder tiers until billing is
@@ -27,6 +29,46 @@ enum SubscriptionTier {
   STANDARD
   PROFESSIONAL
   ENTERPRISE
+}
+
+/// Roles reflect how Spanish public-service contractors are actually organised
+/// (SPEC §1). The permission each one carries is defined in lib/auth/matrix.ts,
+/// never inline in a query.
+enum Role {
+  /// Full control including billing and deleting the organisation.
+  OWNER
+  /// Everything except billing and organisation deletion.
+  ORG_ADMIN
+  /// Responsable de contrato — scoped to their own contracts.
+  GESTOR_CONTRATO
+  /// Asesoría jurídica interna — all expedientes, plazos and escritos.
+  JURIDICO
+  /// Despacho externo — read-mostly, scoped by AccessGrant, time-boxed.
+  LETRADO_EXTERNO
+  /// Calidad y PRL — incidencias, riesgos, acciones correctoras.
+  CALIDAD
+  /// RRHH y relaciones laborales — plantilla, ausencias, subrogación.
+  RRHH
+  /// Administración — facturación, morosidad, provisiones.
+  ADMIN_CONTABLE
+  /// Frontline — reports incidents, completes assigned tasks.
+  CONTRIBUTOR
+  /// Read-only across the organisation.
+  VIEWER
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+/// What an AccessGrant is scoped to. Used for external counsel, who must see
+/// exactly their expedientes and nothing else.
+enum AccessScopeType {
+  EXPEDIENTE
+  CONTRATO
+  ORGANISATION
 }
 
 /// The tenant root. Every other tenant-owned record hangs off this via
@@ -39,7 +81,14 @@ model Organisation {
 
   logoUrl String?
 
-  /// IANA timezone. Expiry comparisons are date-only in this zone (SPEC §6.3).
+  /// NIF de la empresa.
+  nif             String?
+  cnae            String?
+  domicilioSocial String?
+  /// Código ROLECE (Registro Oficial de Licitadores).
+  codigoRolece    String?
+
+  /// IANA timezone. Date-only comparisons for plazos happen in this zone.
   timezone             String @default("Europe/Madrid")
   locale               String @default("es-ES")
   /// ISO 4217. Cross-currency aggregation is out of scope for v1.
@@ -58,6 +107,218 @@ model Organisation {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  memberships  Membership[]
+  teams        Team[]
+  accessGrants AccessGrant[]
+
   @@index([deletedAt])
   @@map("organisations")
+}
+
+/// A person. Users are global: the same person may belong to several
+/// organisations, so nothing tenant-specific lives here — that is Membership.
+model User {
+  id String @id @default(cuid(2))
+
+  /// Stored lowercased; uniqueness is enforced case-insensitively by a
+  /// functional index in the migration.
+  email           String    @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String?
+  name            String
+  avatarUrl       String?
+  phone           String?
+  jobTitle        String?
+
+  locale String @default("es-ES")
+
+  /// TOTP. Mandatory for OWNER and ORG_ADMIN (SPEC §7.4); the secret is
+  /// encrypted at rest and never returned by the data access layer.
+  mfaEnabled       Boolean   @default(false)
+  mfaSecret        String?
+  mfaEnrolledAt    DateTime?
+  mfaRecoveryCodes String[]
+
+  lastLoginAt      DateTime?
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships       Membership[]
+  sessions          Session[]
+  accounts          Account[]
+  invitationsSent   Membership[]  @relation("InvitedBy")
+  accessGrants      AccessGrant[] @relation("Grantee")
+  accessGrantsGiven AccessGrant[] @relation("GrantedBy")
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// The join between a person and an organisation, carrying their role. This is
+/// the row the session resolves to, and the anchor for every permission check.
+model Membership {
+  id             String @id @default(cuid(2))
+  userId         String
+  organisationId String
+
+  role   Role
+  status MembershipStatus @default(INVITED)
+
+  /// Single-use invitation token, stored hashed. Cleared on acceptance.
+  invitationTokenHash String?   @unique
+  invitationExpiresAt DateTime?
+  invitedById         String?
+  invitedAt           DateTime?
+  acceptedAt          DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  teamMembers  TeamMember[]
+
+  @@unique([userId, organisationId])
+  @@index([organisationId, status])
+  @@index([organisationId, role])
+  @@index([userId])
+  @@index([invitedById])
+  @@map("memberships")
+}
+
+/// Teams group people for assignment and for scoped access — a GESTOR_CONTRATO
+/// reaches the contracts assigned to their team as well as their own.
+model Team {
+  id             String  @id @default(cuid(2))
+  organisationId String
+  name           String
+  description    String?
+  parentTeamId   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  parentTeam   Team?        @relation("TeamHierarchy", fields: [parentTeamId], references: [id], onDelete: SetNull)
+  childTeams   Team[]       @relation("TeamHierarchy")
+  members      TeamMember[]
+
+  @@unique([organisationId, name])
+  @@index([organisationId, deletedAt])
+  @@index([parentTeamId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id           String  @id @default(cuid(2))
+  teamId       String
+  membershipId String
+  roleInTeam   String?
+  isLead       Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, membershipId])
+  @@index([membershipId])
+  @@map("team_members")
+}
+
+/// Time-boxed, explicitly scoped access — the mechanism behind LETRADO_EXTERNO.
+/// A grant never widens a role; it only makes specific records reachable.
+model AccessGrant {
+  id             String @id @default(cuid(2))
+  organisationId String
+  granteeUserId  String
+
+  scopeType AccessScopeType
+  /// Ids of the scoped records. Replaced by a child table if a grant ever needs
+  /// per-record attributes; see ADR 0004 on why this is the one tolerated
+  /// exception — these are opaque references validated at resolution time, not
+  /// a modelled association.
+  scopeIds  String[]
+
+  startsAt  DateTime
+  expiresAt DateTime
+  revokedAt DateTime?
+  reason    String
+
+  grantedById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  grantee      User         @relation("Grantee", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  grantedBy    User         @relation("GrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, granteeUserId])
+  @@index([granteeUserId, expiresAt])
+  @@index([grantedById])
+  @@map("access_grants")
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js (NextAuth v5) adapter models. Shapes are fixed by the adapter.
+// ---------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid(2))
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid(2))
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  /// Which organisation this session is currently acting in. Switching orgs
+  /// rewrites this, so a session is always unambiguously single-tenant.
+  activeOrganisationId String?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }

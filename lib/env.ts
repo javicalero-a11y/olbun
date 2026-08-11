@@ -10,8 +10,14 @@ import { z } from 'zod';
 const serverSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
-  /** Postgres connection string used by Prisma. */
+  /**
+   * Postgres connection for the running application. Must point at a
+   * NON-superuser role, or row-level security is silently bypassed.
+   */
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+
+  /** Owner-role connection used only by migrations and seeds. */
+  DIRECT_DATABASE_URL: z.string().min(1, 'DIRECT_DATABASE_URL is required'),
 
   /** Canonical origin of the app, used for links in emails and redirects. */
   APP_URL: z.url().default('http://localhost:3000'),

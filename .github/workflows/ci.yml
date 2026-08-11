@@ -10,7 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DATABASE_URL: postgresql://olbun:olbun@localhost:5432/olbun?schema=public
+  DATABASE_URL: postgresql://olbun_app:olbun_app_dev_only@localhost:5432/olbun?schema=public
+  DIRECT_DATABASE_URL: postgresql://olbun:olbun@localhost:5432/olbun?schema=public
   APP_URL: http://localhost:3100
   NODE_ENV: test
 

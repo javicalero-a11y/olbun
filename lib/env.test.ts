@@ -4,7 +4,8 @@ import { parseServerEnv, resetServerEnvCache, serverEnv } from './env';
 
 const valid = {
   NODE_ENV: 'test',
-  DATABASE_URL: 'postgresql://olbun:olbun@localhost:5433/olbun',
+  DATABASE_URL: 'postgresql://olbun_app:secret@localhost:5433/olbun',
+  DIRECT_DATABASE_URL: 'postgresql://olbun:olbun@localhost:5433/olbun',
 } satisfies Record<string, string | undefined>;
 
 describe('parseServerEnv', () => {
@@ -61,6 +62,7 @@ describe('serverEnv', () => {
 
   it('parses process.env and caches the result', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
+    vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     resetServerEnvCache();
 
     const first = serverEnv();
@@ -71,6 +73,7 @@ describe('serverEnv', () => {
 
   it('re-reads process.env after the cache is reset', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
+    vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     resetServerEnvCache();
     const first = serverEnv();
 
@@ -83,6 +86,7 @@ describe('serverEnv', () => {
 
   it('throws when the real environment is invalid', () => {
     vi.stubEnv('DATABASE_URL', '');
+    vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     resetServerEnvCache();
 
     expect(() => serverEnv()).toThrowError(/DATABASE_URL/);
