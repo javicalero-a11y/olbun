@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { Prisma } from '@prisma/client';
 
-import { prisma } from './prisma';
+import { prisma, prismaElevated } from './prisma';
 
 /**
  * The tenant-scoped data access layer (SPEC §7.2).
@@ -134,12 +134,18 @@ export function tenantClient(organisationId: string) {
 }
 
 /**
- * Escape hatch for the few operations that legitimately span tenants: sign-in
- * (resolving a user before an organisation is known), organisation creation,
- * and platform administration. Every call site must justify itself in a comment
- * — grep for this name in review.
+ * The identity plane: the handful of operations that legitimately span tenants
+ * and therefore cannot run under row-level security — sign-up (which creates
+ * the organisation, so there is no scope to be inside yet), sign-in (which
+ * resolves a user before any organisation is known), and session resolution
+ * (which asks which organisations a person belongs to).
+ *
+ * Returns the elevated, owner-role client. **RLS does not apply to it.** Every
+ * call site passes a justification and is expected to filter by user id
+ * explicitly; grep for this name in review, and treat a new call site outside
+ * `lib/auth` or the sign-up service as a finding.
  */
-export function unscopedClientBecause(reason: string): typeof prisma {
-  if (!reason) throw new Error('unscopedClientBecause requires a justification');
-  return prisma;
+export function identityClientBecause(reason: string): typeof prismaElevated {
+  if (!reason) throw new Error('identityClientBecause requires a justification');
+  return prismaElevated;
 }

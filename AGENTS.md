@@ -142,6 +142,11 @@ Carried deliberately; each has an owner milestone.
 
 Needs a human answer; the full list with reasoning is in `SPEC.md` §9.
 
+0. **Identity plane runs on an elevated connection.** Sign-up, sign-in and
+   session resolution use `identityClientBecause()`, which returns the
+   owner-role client and is **not** constrained by RLS — they span tenants by
+   definition. Treat any new call site outside `lib/auth` or the sign-up
+   service as a review finding.
 1. **Legal validation of the plazo engine (blocks M3 for production, not for
    development).** The Ley 39/2015 computation rules in SPEC §6.1 need review by
    a Spanish lawyer — which municipal calendar governs when the interested party

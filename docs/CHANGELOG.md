@@ -28,10 +28,24 @@ SPEC §12.
 - Case-insensitive unique index on `users.email`.
 - ADR 0005 on the three isolation layers and the two-role split.
 
+- Auth.js v5 with credentials, argon2id (64 MiB, 3 iterations) and account
+  lockout after 5 failed attempts. Session config split so middleware stays
+  edge-safe.
+- Sign-up creates person, organisation and OWNER membership in one
+  transaction; slug generation strips Spanish accents and legal forms
+  ("Servicios Integrales Guadaíra, S.L." → `servicios-integrales-guadaira`).
+- Organisation-scoped app shell. The organisation comes from the URL and is
+  re-checked against the membership table per request, so a role change takes
+  effect immediately rather than at next sign-in.
+- Identity plane split from the data plane: sign-up, sign-in and session
+  resolution use an elevated connection because they legitimately span
+  tenants; everything else stays on the RLS-constrained role.
+- HIBP breach check via k-anonymity, failing open.
+- 20 end-to-end tests covering sign-up, sign-in, sign-out and cross-tenant 404.
+
 #### Deferred to the next chunk of M1
 
-- Auth.js wiring (sign-up, sign-in, magic link), MFA enrolment, invitation
-  flow, organisation switching, and the settings UI.
+- MFA enrolment, invitation flow, magic-link sign-in, and the settings UI.
 
 ### M0 — Foundation
 

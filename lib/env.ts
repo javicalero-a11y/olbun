@@ -19,6 +19,9 @@ const serverSchema = z.object({
   /** Owner-role connection used only by migrations and seeds. */
   DIRECT_DATABASE_URL: z.string().min(1, 'DIRECT_DATABASE_URL is required'),
 
+  /** Signs session tokens. Auth.js reads it from the environment directly. */
+  AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
+
   /** Canonical origin of the app, used for links in emails and redirects. */
   APP_URL: z.url().default('http://localhost:3000'),
 

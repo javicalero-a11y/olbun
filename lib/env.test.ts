@@ -6,6 +6,7 @@ const valid = {
   NODE_ENV: 'test',
   DATABASE_URL: 'postgresql://olbun_app:secret@localhost:5433/olbun',
   DIRECT_DATABASE_URL: 'postgresql://olbun:olbun@localhost:5433/olbun',
+  AUTH_SECRET: 'x'.repeat(32),
 } satisfies Record<string, string | undefined>;
 
 describe('parseServerEnv', () => {
@@ -63,6 +64,7 @@ describe('serverEnv', () => {
   it('parses process.env and caches the result', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
+    vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
     resetServerEnvCache();
 
     const first = serverEnv();
@@ -74,6 +76,7 @@ describe('serverEnv', () => {
   it('re-reads process.env after the cache is reset', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
+    vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
     resetServerEnvCache();
     const first = serverEnv();
 
@@ -87,6 +90,7 @@ describe('serverEnv', () => {
   it('throws when the real environment is invalid', () => {
     vi.stubEnv('DATABASE_URL', '');
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
+    vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
     resetServerEnvCache();
 
     expect(() => serverEnv()).toThrowError(/DATABASE_URL/);
