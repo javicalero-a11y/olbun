@@ -2,9 +2,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { authConfig } from './auth.config';
-import { verifyPassword } from '@/lib/auth/password';
-import { identityClientBecause } from '@/lib/db/tenant';
-import { logger } from '@/lib/logger';
+import { verificarCredenciales } from '@/lib/services/acceso';
 import { signInSchema } from '@/lib/validation/auth';
 
 /**
@@ -14,13 +12,13 @@ import { signInSchema } from '@/lib/validation/auth';
  * it comes from the URL and is re-checked against the membership table on
  * every request (see lib/auth/session.ts), so a stale token can never widen
  * access.
+ *
+ * All credential logic lives in lib/services/acceso.ts, shared with the sign-in
+ * server action so the lockout counter and the MFA rules cannot drift between
+ * the two paths.
  */
 
-/** SPEC §7.4: 5 failed attempts per 15 minutes. */
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_MINUTES = 15;
-
-/** Absolute session lifetime, regardless of activity. */
+/** Absolute session lifetime, regardless of activity (SPEC §7.4). */
 const ABSOLUTE_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -30,66 +28,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: 'Correo electrónico', type: 'email' },
         password: { label: 'Contraseña', type: 'password' },
+        codigo: { label: 'Código de verificación', type: 'text' },
       },
       async authorize(credentials) {
         const parsed = signInSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
-        const db = identityClientBecause(
-          'sign-in resolves a user before any organisation is known',
+        const bruto = credentials['codigo'];
+        const codigo = typeof bruto === 'string' && bruto.length > 0 ? bruto : undefined;
+
+        const resultado = await verificarCredenciales(
+          parsed.data.email,
+          parsed.data.password,
+          codigo,
         );
 
-        const user = await db.user.findFirst({
-          where: { email, deletedAt: null },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            passwordHash: true,
-            failedLoginCount: true,
-            lockedUntil: true,
-          },
-        });
+        if (resultado.estado !== 'OK') return null;
 
-        // Always spend roughly the same time whether or not the account exists,
-        // so response timing does not reveal which addresses are registered.
-        if (!user?.passwordHash) {
-          await verifyPassword(
-            '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzb21lc2FsdA$0000000000000000000000000000000000000000000',
-            password,
-          );
-          return null;
-        }
-
-        if (user.lockedUntil && user.lockedUntil > new Date()) {
-          logger.warn({ userId: user.id }, 'Intento de acceso sobre cuenta bloqueada');
-          return null;
-        }
-
-        const valid = await verifyPassword(user.passwordHash, password);
-
-        if (!valid) {
-          const failedLoginCount = user.failedLoginCount + 1;
-          const lockedUntil =
-            failedLoginCount >= MAX_FAILED_ATTEMPTS
-              ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
-              : null;
-
-          await db.user.update({
-            where: { id: user.id },
-            data: { failedLoginCount, lockedUntil },
-          });
-
-          return null;
-        }
-
-        await db.user.update({
-          where: { id: user.id },
-          data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
-        });
-
-        return { id: user.id, email: user.email, name: user.name };
+        return { id: resultado.userId, email: resultado.email, name: resultado.nombre };
       },
     }),
   ],

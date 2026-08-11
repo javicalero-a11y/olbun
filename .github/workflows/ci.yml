@@ -14,6 +14,7 @@ env:
   DIRECT_DATABASE_URL: postgresql://olbun:olbun@localhost:5432/olbun?schema=public
   APP_URL: http://localhost:3100
   AUTH_SECRET: ci-secret-not-used-for-anything-real-000000
+  ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   NODE_ENV: test
 
 jobs:

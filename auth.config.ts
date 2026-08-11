@@ -33,6 +33,10 @@ export const authConfig = {
         pathname === '/' ||
         pathname.startsWith('/acceso') ||
         pathname.startsWith('/registro') ||
+        // An invited person has no session by definition — requiring one here
+        // would make every invitation impossible to accept. The token in the
+        // URL is the credential, and it is validated by the page itself.
+        pathname.startsWith('/invitacion/') ||
         pathname.startsWith('/api/auth') ||
         pathname.startsWith('/api/health');
 

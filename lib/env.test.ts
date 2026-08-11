@@ -7,6 +7,7 @@ const valid = {
   DATABASE_URL: 'postgresql://olbun_app:secret@localhost:5433/olbun',
   DIRECT_DATABASE_URL: 'postgresql://olbun:olbun@localhost:5433/olbun',
   AUTH_SECRET: 'x'.repeat(32),
+  ENCRYPTION_KEY: 'y'.repeat(44),
 } satisfies Record<string, string | undefined>;
 
 describe('parseServerEnv', () => {
@@ -65,6 +66,7 @@ describe('serverEnv', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
+    vi.stubEnv('ENCRYPTION_KEY', valid.ENCRYPTION_KEY);
     resetServerEnvCache();
 
     const first = serverEnv();
@@ -77,6 +79,7 @@ describe('serverEnv', () => {
     vi.stubEnv('DATABASE_URL', valid.DATABASE_URL);
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
+    vi.stubEnv('ENCRYPTION_KEY', valid.ENCRYPTION_KEY);
     resetServerEnvCache();
     const first = serverEnv();
 
@@ -91,6 +94,7 @@ describe('serverEnv', () => {
     vi.stubEnv('DATABASE_URL', '');
     vi.stubEnv('DIRECT_DATABASE_URL', valid.DIRECT_DATABASE_URL);
     vi.stubEnv('AUTH_SECRET', valid.AUTH_SECRET);
+    vi.stubEnv('ENCRYPTION_KEY', valid.ENCRYPTION_KEY);
     resetServerEnvCache();
 
     expect(() => serverEnv()).toThrowError(/DATABASE_URL/);

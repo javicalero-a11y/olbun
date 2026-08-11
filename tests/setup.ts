@@ -9,4 +9,5 @@
 process.env['DATABASE_URL'] ??= 'postgresql://olbun_app:test@localhost:5433/olbun_test';
 process.env['DIRECT_DATABASE_URL'] ??= 'postgresql://olbun:test@localhost:5433/olbun_test';
 process.env['AUTH_SECRET'] ??= 'test-secret-not-used-for-anything-real-000';
+process.env['ENCRYPTION_KEY'] ??= Buffer.alloc(32, 1).toString('base64');
 process.env['LOG_LEVEL'] ??= 'fatal';

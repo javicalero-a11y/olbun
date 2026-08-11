@@ -1,20 +1,8 @@
 import Link from 'next/link';
 
 import { cerrarSesion } from '@/app/(app)/acciones';
+import { ETIQUETA_ROL } from '@/lib/auth/etiquetas';
 import type { Role } from '@prisma/client';
-
-const ETIQUETA_ROL: Record<Role, string> = {
-  OWNER: 'Propietario',
-  ORG_ADMIN: 'Administración',
-  GESTOR_CONTRATO: 'Responsable de contrato',
-  JURIDICO: 'Asesoría jurídica',
-  LETRADO_EXTERNO: 'Letrado externo',
-  CALIDAD: 'Calidad y PRL',
-  RRHH: 'RRHH',
-  ADMIN_CONTABLE: 'Administración contable',
-  CONTRIBUTOR: 'Colaborador',
-  VIEWER: 'Sólo lectura',
-};
 
 interface CabeceraProps {
   organisation: { slug: string; name: string };
@@ -57,6 +45,13 @@ export function CabeceraApp({ organisation, organisations, user, rol }: Cabecera
               ))}
             </nav>
           ) : null}
+
+          <Link
+            href={`/${organisation.slug}/ajustes`}
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Ajustes
+          </Link>
 
           <div className="text-right">
             <p className="text-sm leading-tight font-medium">{user.name}</p>

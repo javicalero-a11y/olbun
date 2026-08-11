@@ -68,10 +68,10 @@ const AREAS: Area[] = [
     permiso: 'factura:view',
   },
   {
-    titulo: 'Ajustes',
-    descripcion: 'Usuarios, roles, equipos y configuración.',
+    titulo: 'Usuarios y equipo',
+    descripcion: 'Quién tiene acceso, con qué rol, y a quién invitar.',
     hito: 'M1',
-    permiso: 'settings:manage',
+    permiso: 'user:list',
   },
 ];
 

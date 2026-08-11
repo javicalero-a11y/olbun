@@ -43,9 +43,29 @@ SPEC §12.
 - HIBP breach check via k-anonymity, failing open.
 - 20 end-to-end tests covering sign-up, sign-in, sign-out and cross-tenant 404.
 
-#### Deferred to the next chunk of M1
+- Invitations: single-use token stored only as a SHA-256 hash, 7-day expiry,
+  consumed in the same update that activates the membership. Accepting as an
+  existing user adds a membership rather than a second account.
+- Mail behind a `MailService` interface. Development logs to the console;
+  production refuses to start rather than silently dropping messages. A mail
+  failure no longer discards the invitation — the link is handed back to the
+  administrator instead.
+- Two-factor authentication: TOTP with QR enrolment, ten single-use recovery
+  codes, mandatory for OWNER and ORG_ADMIN, integrated into sign-in.
+- AES-256-GCM field encryption with a self-describing format that carries its
+  version and key id, so a future KMS migration does not require re-encrypting
+  everything. Used for TOTP secrets now, personal data from M11.
+- Settings: team list, invitations, role changes and suspension, all gated by
+  the permission matrix and guarded again server-side. The last owner cannot
+  be demoted or suspended.
 
-- MFA enrolment, invitation flow, magic-link sign-in, and the settings UI.
+#### Known gaps
+
+- A person invited before they have an account gets their email local-part as a
+  display name; the accept form should ask for it.
+- No magic-link sign-in yet.
+- `MAIL_TRANSPORT` has no real provider wired up — production will refuse to
+  send until one is configured.
 
 ### M0 — Foundation
 

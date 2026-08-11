@@ -22,6 +22,12 @@ const serverSchema = z.object({
   /** Signs session tokens. Auth.js reads it from the environment directly. */
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
 
+  /**
+   * 32 bytes, base64. Encrypts TOTP secrets and, from M11, personal data.
+   * Rotating it changes the key id embedded in every new ciphertext.
+   */
+  ENCRYPTION_KEY: z.string().min(44, 'ENCRYPTION_KEY must be 32 bytes encoded as base64'),
+
   /** Canonical origin of the app, used for links in emails and redirects. */
   APP_URL: z.url().default('http://localhost:3000'),
 

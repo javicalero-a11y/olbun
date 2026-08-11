@@ -32,7 +32,23 @@ export function FormularioAcceso() {
         errores={estado.errores?.['password']}
       />
 
-      <BotonEnviar pendiente={pendiente}>Entrar</BotonEnviar>
+      {estado.requiereMfa ? (
+        <Campo
+          etiqueta="Código de verificación"
+          nombre="codigo"
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          required
+          ayuda="Los seis dígitos de tu aplicación de autenticación, o un código de recuperación."
+          errores={estado.errores?.['codigo']}
+        />
+      ) : null}
+
+      <BotonEnviar pendiente={pendiente}>
+        {estado.requiereMfa ? 'Verificar' : 'Entrar'}
+      </BotonEnviar>
     </form>
   );
 }
