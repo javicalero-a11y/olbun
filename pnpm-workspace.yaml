@@ -1,0 +1,25 @@
+# Postinstall scripts are blocked by default (pnpm supply-chain protection).
+# Each entry below is an explicit decision to allow one — all are first-party
+# packages whose install step compiles or downloads a required native binary.
+allowBuilds:
+  '@prisma/client': true # generates the typed client
+  '@prisma/engines': true # downloads the query engine binary
+  prisma: true # CLI engine binaries
+  esbuild: true # native binary for vitest/tsx
+  sharp: true # native image pipeline for next/image
+  unrs-resolver: true # native module resolver used by eslint-plugin-import
+
+# Versions published more recently than pnpm's minimum release age. Reviewed and
+# accepted; re-check when bumping.
+minimumReleaseAgeExclude:
+  - '@typescript-eslint/eslint-plugin@8.67.0'
+  - '@typescript-eslint/parser@8.67.0'
+  - '@typescript-eslint/project-service@8.67.0'
+  - '@typescript-eslint/scope-manager@8.67.0'
+  - '@typescript-eslint/tsconfig-utils@8.67.0'
+  - '@typescript-eslint/type-utils@8.67.0'
+  - '@typescript-eslint/types@8.67.0'
+  - '@typescript-eslint/typescript-estree@8.67.0'
+  - '@typescript-eslint/utils@8.67.0'
+  - '@typescript-eslint/visitor-keys@8.67.0'
+  - typescript-eslint@8.67.0

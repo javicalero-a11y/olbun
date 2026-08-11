@@ -1,0 +1,31 @@
+name: olbun
+
+# Local development dependencies only. Redis (BullMQ) arrives in M5 and MinIO
+# (document storage) in M6; they are deliberately absent until something uses
+# them. Integration tests spin up their own Postgres via Testcontainers.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: olbun-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: olbun
+      POSTGRES_PASSWORD: olbun
+      POSTGRES_DB: olbun
+      # Deterministic collation so ORDER BY matches across dev machines and CI.
+      POSTGRES_INITDB_ARGS: '--locale-provider=icu --icu-locale=es-ES --encoding=UTF8'
+    ports:
+      # 5433 on the host to avoid colliding with a locally installed Postgres.
+      - '5433:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U olbun -d olbun']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:

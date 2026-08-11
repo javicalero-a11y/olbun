@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Olbun design tokens (SPEC §9).
+ *
+ * Rules:
+ *   1. A neutral slate foundation carries the entire interface.
+ *   2. Exactly one brand accent (deep indigo) for interactive emphasis.
+ *   3. Every other colour is a *status* colour. If something on screen is red,
+ *      it means something. Never decorate with semantic colour.
+ *   4. Status is never encoded in colour alone — RAG chips pair the colour with
+ *      a label or icon (WCAG 2.2 AA, SPEC §8).
+ */
+
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.995 0 0);
+  --foreground: oklch(0.21 0.02 264);
+
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(0.45 0.16 264);
+  --primary-foreground: oklch(0.985 0.005 264);
+
+  --secondary: oklch(0.968 0.007 264);
+  --secondary-foreground: oklch(0.28 0.03 264);
+
+  --muted: oklch(0.968 0.007 264);
+  --muted-foreground: oklch(0.53 0.02 264);
+
+  --accent: oklch(0.955 0.012 264);
+  --accent-foreground: oklch(0.28 0.03 264);
+
+  --destructive: oklch(0.55 0.21 27);
+  --destructive-foreground: oklch(0.985 0.005 264);
+
+  --border: oklch(0.92 0.008 264);
+  --input: oklch(0.92 0.008 264);
+  --ring: oklch(0.45 0.16 264);
+
+  /* Status semantics — RAG plus the neutral/info states used by StatusChip. */
+  --status-green: oklch(0.55 0.13 152);
+  --status-green-subtle: oklch(0.95 0.04 152);
+  --status-amber: oklch(0.65 0.14 75);
+  --status-amber-subtle: oklch(0.96 0.05 75);
+  --status-red: oklch(0.55 0.19 27);
+  --status-red-subtle: oklch(0.95 0.04 27);
+  --status-neutral: oklch(0.55 0.02 264);
+  --status-neutral-subtle: oklch(0.96 0.005 264);
+  --status-info: oklch(0.55 0.12 240);
+  --status-info-subtle: oklch(0.95 0.04 240);
+}
+
+.dark {
+  --background: oklch(0.17 0.015 264);
+  --foreground: oklch(0.96 0.005 264);
+
+  --card: oklch(0.21 0.018 264);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.21 0.018 264);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(0.68 0.14 264);
+  --primary-foreground: oklch(0.17 0.02 264);
+
+  --secondary: oklch(0.27 0.02 264);
+  --secondary-foreground: oklch(0.96 0.005 264);
+
+  --muted: oklch(0.27 0.02 264);
+  --muted-foreground: oklch(0.7 0.02 264);
+
+  --accent: oklch(0.3 0.025 264);
+  --accent-foreground: oklch(0.96 0.005 264);
+
+  --destructive: oklch(0.62 0.2 27);
+  --destructive-foreground: oklch(0.98 0.005 264);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.68 0.14 264);
+
+  --status-green: oklch(0.72 0.15 152);
+  --status-green-subtle: oklch(0.3 0.06 152);
+  --status-amber: oklch(0.78 0.14 75);
+  --status-amber-subtle: oklch(0.33 0.06 75);
+  --status-red: oklch(0.68 0.18 27);
+  --status-red-subtle: oklch(0.32 0.08 27);
+  --status-neutral: oklch(0.7 0.02 264);
+  --status-neutral-subtle: oklch(0.3 0.02 264);
+  --status-info: oklch(0.7 0.12 240);
+  --status-info-subtle: oklch(0.3 0.06 240);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-green: var(--status-green);
+  --color-status-green-subtle: var(--status-green-subtle);
+  --color-status-amber: var(--status-amber);
+  --color-status-amber-subtle: var(--status-amber-subtle);
+  --color-status-red: var(--status-red);
+  --color-status-red-subtle: var(--status-red-subtle);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-subtle: var(--status-neutral-subtle);
+  --color-status-info: var(--status-info);
+  --color-status-info-subtle: var(--status-info-subtle);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numeric columns must align; SPEC §9 requires tabular figures. */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

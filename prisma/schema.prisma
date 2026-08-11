@@ -1,0 +1,63 @@
+// Olbun — Prisma schema.
+//
+// Conventions (see AGENTS.md and SPEC §4):
+//   * Primary keys are cuid2.
+//   * Every tenant-owned model carries organisationId + the audit columns
+//     (createdAt, updatedAt, createdById, updatedById, deletedAt, deletedById)
+//     and a composite index beginning with organisationId.
+//   * Append-only models (AuditEvent, RiskAssessment, DocumentVersion) are
+//     exempt from updatedAt/deletedAt — see docs/adr/0004-immutable-models.md.
+//
+// M0 defines only Organisation, the tenancy root. Identity (User, Membership)
+// lands in M1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Commercial plan for an organisation. Placeholder tiers until billing is
+/// specified; only used for feature gating from M13 onwards.
+enum SubscriptionTier {
+  TRIAL
+  STANDARD
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+/// The tenant root. Every other tenant-owned record hangs off this via
+/// organisationId and is filtered by the tenant-scoped data access layer.
+model Organisation {
+  id   String @id @default(cuid(2))
+  name String
+  /// URL-safe identifier used in every authenticated route: /[orgSlug]/...
+  slug String @unique
+
+  logoUrl String?
+
+  /// IANA timezone. Expiry comparisons are date-only in this zone (SPEC §6.3).
+  timezone             String @default("Europe/Madrid")
+  locale               String @default("es-ES")
+  /// ISO 4217. Cross-currency aggregation is out of scope for v1.
+  currency             String @default("EUR")
+  /// Mes de inicio del ejercicio fiscal, 1–12. En España coincide con el año natural.
+  fiscalYearStartMonth Int    @default(1)
+
+  subscriptionTier SubscriptionTier @default(TRIAL)
+
+  /// Tenant-configurable settings that do not warrant their own columns.
+  settings Json @default("{}")
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+  @@map("organisations")
+}
