@@ -20,10 +20,10 @@ export function Logotipo({
   tamano?: 'normal' | 'grande';
   className?: string;
 }) {
-  const alto = tamano === 'grande' ? 34 : 22;
+  const alto = tamano === 'grande' ? 46 : 32;
 
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
         src={marca}
         alt=""
@@ -35,7 +35,7 @@ export function Logotipo({
       />
       <span
         className={`font-semibold tracking-[0.18em] ${
-          tamano === 'grande' ? 'text-lg' : 'text-xs'
+          tamano === 'grande' ? 'text-2xl' : 'text-base'
         }`}
       >
         OLBUN

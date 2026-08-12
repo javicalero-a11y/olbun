@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: Readonly<{ children: React.Reac
 
       <header className="relative px-6 py-6">
         <Link href="/" aria-label="Olbun, inicio" className="inline-block">
-          <Logotipo />
+          <Logotipo tamano="grande" />
         </Link>
       </header>
 
