@@ -32,7 +32,18 @@ import { prisma, prismaElevated } from './prisma';
  * either global (User, Account, Session) or reached through a parent, and is
  * protected by RLS alone — see the migration for those policies.
  */
-const TENANT_OWNED = new Set<string>(['Membership', 'Team', 'AccessGrant']);
+const TENANT_OWNED = new Set<string>([
+  'Membership',
+  'Team',
+  'AccessGrant',
+  'PoderAdjudicador',
+  'ContactoPoderAdjudicador',
+  'Contrato',
+  'Modificado',
+]);
+
+/** Exported so a test can assert it covers every model carrying organisationId. */
+export const MODELOS_CON_TENANT: ReadonlySet<string> = TENANT_OWNED;
 
 /** Operations whose `args` carry a `where` we must constrain. */
 const FILTERED_OPERATIONS = new Set<string>([
@@ -62,6 +73,14 @@ function constrainWhere(args: UnknownArgs, organisationId: string): UnknownArgs 
   return { ...args, where: { ...where, organisationId } };
 }
 
+/**
+ * Stamps the bound organisation onto created rows.
+ *
+ * `organisationId` is spread *last* deliberately: Prisma's generated types
+ * require the field, so call sites pass it, and this overwrites whatever they
+ * passed. A copy-pasted or mistaken id therefore cannot write into another
+ * tenant — the binding always wins.
+ */
 function stampCreate(args: UnknownArgs, organisationId: string): UnknownArgs {
   const data = args['data'];
 

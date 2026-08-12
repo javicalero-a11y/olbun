@@ -107,9 +107,11 @@ model Organisation {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships  Membership[]
-  teams        Team[]
-  accessGrants AccessGrant[]
+  memberships          Membership[]
+  teams                Team[]
+  accessGrants         AccessGrant[]
+  poderesAdjudicadores PoderAdjudicador[]
+  contratos            Contrato[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -374,4 +376,248 @@ model Festivo {
   @@unique([calendarioId, fecha])
   @@index([fecha])
   @@map("festivos")
+}
+
+// ---------------------------------------------------------------------------
+// M4 — Poderes adjudicadores y contratos (LCSP, Ley 9/2017)
+// ---------------------------------------------------------------------------
+
+/// Type of contracting authority. Drawn from how the Spanish public sector is
+/// actually organised, because the type drives which sede electrónica a
+/// notification arrives through and which boletín publishes its calendar.
+enum TipoPoderAdjudicador {
+  AYUNTAMIENTO
+  DIPUTACION
+  CABILDO_CONSELL
+  COMUNIDAD_AUTONOMA
+  ADMINISTRACION_GENERAL_ESTADO
+  ORGANISMO_AUTONOMO
+  ENTIDAD_PUBLICA_EMPRESARIAL
+  SERVICIO_SALUD
+  UNIVERSIDAD
+  CONSORCIO
+  MANCOMUNIDAD
+  EMPRESA_PUBLICA
+  OTRO
+}
+
+/// Contract type — art. 12 y ss. LCSP.
+enum TipoContrato {
+  SERVICIOS
+  OBRAS
+  SUMINISTROS
+  CONCESION_SERVICIOS
+  CONCESION_OBRAS
+  MIXTO
+  PRIVADO
+}
+
+/// Award procedure — art. 131 y ss. LCSP.
+enum ProcedimientoAdjudicacion {
+  ABIERTO
+  ABIERTO_SIMPLIFICADO
+  ABIERTO_SIMPLIFICADO_ABREVIADO
+  RESTRINGIDO
+  NEGOCIADO_SIN_PUBLICIDAD
+  LICITACION_CON_NEGOCIACION
+  DIALOGO_COMPETITIVO
+  ASOCIACION_INNOVACION
+  CONTRATO_MENOR
+  ACUERDO_MARCO
+  SISTEMA_DINAMICO
+  ENCARGO_MEDIO_PROPIO
+}
+
+enum EstadoContrato {
+  LICITACION
+  ADJUDICADO
+  FORMALIZADO
+  EN_EJECUCION
+  PRORROGADO
+  SUSPENDIDO
+  EN_LIQUIDACION
+  FINALIZADO
+  RESUELTO
+  PERDIDO
+}
+
+enum TipoModificado {
+  MODIFICADO_PREVISTO
+  MODIFICADO_NO_PREVISTO
+  REVISION_PRECIOS
+  REEQUILIBRIO
+  PRORROGA
+  SUSPENSION
+  CESION
+}
+
+enum EstadoModificado {
+  BORRADOR
+  SOLICITADO
+  EN_TRAMITE
+  APROBADO
+  DENEGADO
+  RETIRADO
+}
+
+/// The public body on the other side of the contract.
+model PoderAdjudicador {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nombre     String
+  nif        String?
+  /// Código DIR3 (Directorio Común de Unidades Orgánicas) — the stable public
+  /// identifier, and how a notification is matched back to an authority.
+  codigoDir3 String?
+  tipo       TipoPoderAdjudicador
+
+  comunidadAutonoma String?
+  provincia         String?
+  /// Código INE del municipio. Decides which local holiday calendar applies to
+  /// deadlines in this authority's procedures.
+  municipioIne      String?
+  municipioNombre   String?
+
+  sedeElectronicaUrl   String?
+  perfilContratanteUrl String?
+  notas                String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation               @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contactos    ContactoPoderAdjudicador[]
+  contratos    Contrato[]
+
+  @@index([organisationId, deletedAt])
+  @@index([organisationId, nombre])
+  @@index([organisationId, codigoDir3])
+  @@map("poderes_adjudicadores")
+}
+
+model ContactoPoderAdjudicador {
+  id                 String @id @default(cuid(2))
+  organisationId     String
+  poderAdjudicadorId String
+
+  nombre                String
+  cargo                 String?
+  email                 String?
+  telefono              String?
+  /// Responsable del contrato designado por el órgano (art. 62 LCSP).
+  esResponsableContrato Boolean @default(false)
+  esEscalado            Boolean @default(false)
+  notas                 String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  poderAdjudicador PoderAdjudicador @relation(fields: [poderAdjudicadorId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, poderAdjudicadorId])
+  @@map("contactos_poder_adjudicador")
+}
+
+model Contrato {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  /// Nº de expediente del órgano de contratación — how the authority refers to
+  /// it in every notification, so it is the key people actually search by.
+  numeroExpediente String
+  objeto           String
+  descripcion      String?
+
+  poderAdjudicadorId String
+  tipo               TipoContrato
+  procedimiento      ProcedimientoAdjudicacion
+  estado             EstadoContrato            @default(LICITACION)
+
+  lote         String?
+  /// Common Procurement Vocabulary codes.
+  cpv          String[]
+  enlacePlacsp String?
+
+  fechaAdjudicacion    DateTime? @db.Date
+  fechaFormalizacion   DateTime? @db.Date
+  fechaInicio          DateTime? @db.Date
+  duracionInicialMeses Int?
+  fechaFinPrevista     DateTime? @db.Date
+
+  /// Prórrogas previstas en el pliego: número, duración y preaviso en días.
+  prorrogasPrevistas   Json?
+  preavisoProrrogaDias Int?
+
+  importeAdjudicacion Decimal? @db.Decimal(14, 2)
+  importeLicitacion   Decimal? @db.Decimal(14, 2)
+  tipoIva             Decimal? @db.Decimal(5, 2)
+
+  hayRevisionPrecios Boolean @default(false)
+  formulaRevision    String?
+
+  garantiaDefinitiva Decimal? @db.Decimal(14, 2)
+  plazoGarantiaMeses Int?
+
+  /// Subrogación de personal impuesta por el pliego o el convenio — the single
+  /// biggest source of labour litigation in this sector.
+  haySubrogacionPersonal Boolean @default(false)
+
+  /// Régimen de penalidades del pliego, para calcular la exposición.
+  regimenPenalidades Json?
+
+  responsableInternoId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation     Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  poderAdjudicador PoderAdjudicador @relation(fields: [poderAdjudicadorId], references: [id], onDelete: Restrict)
+  modificados      Modificado[]
+
+  @@unique([organisationId, numeroExpediente])
+  @@index([organisationId, estado])
+  @@index([organisationId, deletedAt])
+  @@index([organisationId, fechaFinPrevista])
+  @@index([poderAdjudicadorId])
+  @@map("contratos")
+}
+
+model Modificado {
+  id             String @id @default(cuid(2))
+  organisationId String
+  contratoId     String
+
+  referencia  String?
+  tipo        TipoModificado
+  estado      EstadoModificado @default(BORRADOR)
+  descripcion String
+
+  importe                     Decimal? @db.Decimal(14, 2)
+  porcentajeSobreAdjudicacion Decimal? @db.Decimal(6, 3)
+  mesesAmpliacion             Int?
+
+  fechaSolicitud  DateTime? @db.Date
+  fechaAprobacion DateTime? @db.Date
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, contratoId])
+  @@index([organisationId, estado])
+  @@map("modificados")
 }

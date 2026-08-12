@@ -39,20 +39,33 @@ describe('cifrar / descifrar', () => {
     expect(partes[1]).toMatch(/^[0-9a-f]{8}$/);
   });
 
+  /**
+   * Mutates the FIRST base64url character, never the last: the final character
+   * of a base64 group carries only two significant bits, so flipping it often
+   * decodes to the very same bytes and the "tampered" value is not tampered at
+   * all. Written the other way round, this test passes or fails depending on
+   * the random IV.
+   */
+  const alterarPrimerCaracter = (valor: string): string =>
+    (valor.startsWith('A') ? 'B' : 'A') + valor.slice(1);
+
   it('rechaza un texto cifrado manipulado', () => {
-    const cifrado = cifrar('valor íntegro');
-    const partes = cifrado.split('.');
-    // Flip the last character of the ciphertext.
-    const ultimo = partes[4] ?? '';
-    partes[4] = ultimo.slice(0, -1) + (ultimo.endsWith('A') ? 'B' : 'A');
+    const partes = cifrar('valor íntegro').split('.');
+    partes[4] = alterarPrimerCaracter(partes[4] ?? '');
 
     expect(() => descifrar(partes.join('.'))).toThrow();
   });
 
   it('rechaza una etiqueta de autenticación manipulada', () => {
     const partes = cifrar('valor íntegro').split('.');
-    const tag = partes[3] ?? '';
-    partes[3] = tag.slice(0, -1) + (tag.endsWith('A') ? 'B' : 'A');
+    partes[3] = alterarPrimerCaracter(partes[3] ?? '');
+
+    expect(() => descifrar(partes.join('.'))).toThrow();
+  });
+
+  it('rechaza un IV manipulado', () => {
+    const partes = cifrar('valor íntegro').split('.');
+    partes[2] = alterarPrimerCaracter(partes[2] ?? '');
 
     expect(() => descifrar(partes.join('.'))).toThrow();
   });
