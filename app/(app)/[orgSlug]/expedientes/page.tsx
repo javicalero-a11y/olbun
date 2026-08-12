@@ -116,10 +116,7 @@ export default async function ExpedientesPage({
             Ver plazos
           </Link>
           {puedeCrear ? (
-            <Link
-              href={`/${orgSlug}/expedientes/nuevo`}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
+            <Link href={`/${orgSlug}/expedientes/nuevo`} className="boton-primario">
               Nuevo expediente
             </Link>
           ) : null}

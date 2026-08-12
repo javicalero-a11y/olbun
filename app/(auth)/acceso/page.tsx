@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { FormularioAcceso } from '@/components/features/auth/formulario-acceso';
 import { OtrosAccesos } from '@/components/features/auth/otros-accesos';
 import { MENSAJE_RECHAZO, type MotivoRechazo } from '@/lib/auth/politica-acceso';
-import { googleDisponible } from '@/lib/auth/proveedores';
+import { estadoGoogle } from '@/lib/auth/proveedores';
 
 export const metadata: Metadata = { title: 'Entrar' };
 
@@ -38,7 +38,7 @@ export default async function AccesoPage({
 
       <FormularioAcceso />
 
-      <OtrosAccesos google={googleDisponible()} />
+      <OtrosAccesos google={estadoGoogle()} />
 
       <p className="text-sm text-muted-foreground">
         ¿No tienes cuenta?{' '}

@@ -90,10 +90,7 @@ export default async function ContratosPage({
         </div>
 
         {puedeCrear ? (
-          <Link
-            href={`/${orgSlug}/contratos/nuevo`}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
+          <Link href={`/${orgSlug}/contratos/nuevo`} className="boton-primario">
             Nuevo contrato
           </Link>
         ) : null}

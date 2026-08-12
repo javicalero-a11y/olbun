@@ -70,3 +70,18 @@ export function googleDisponible(): boolean {
   const env = serverEnv();
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 }
+
+export type EstadoGoogle = 'activo' | 'sin-configurar' | 'oculto';
+
+/**
+ * What the sign-in page should do about the Google button.
+ *
+ * In production an unconfigured provider is simply absent — a button that
+ * fails when pressed is worse than no button. In development it is shown
+ * disabled instead, so the sign-in page can be reviewed as it will really look
+ * without anyone having to create a Google Cloud project first.
+ */
+export function estadoGoogle(): EstadoGoogle {
+  if (googleDisponible()) return 'activo';
+  return serverEnv().NODE_ENV === 'development' ? 'sin-configurar' : 'oculto';
+}

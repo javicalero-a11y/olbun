@@ -11,14 +11,18 @@ import { Campo, ErrorGeneral } from './campo';
 
 const INICIAL: EstadoFormulario = {};
 
+const BOTON_EXTERNO =
+  'flex w-full items-center justify-center gap-2.5 rounded-md border border-input px-4 py-2 text-sm font-medium';
+
 /**
  * The sign-in routes that are not the password form.
  *
- * The Google button only renders when the deployment has credentials for it —
- * an unconfigured environment shows no button rather than one that fails when
- * clicked.
+ * In production the Google button exists only when the deployment has
+ * credentials for it: a button that fails when pressed is worse than no
+ * button. In development it is shown disabled instead, so this page can be
+ * reviewed as it will really look without a Google Cloud project existing.
  */
-export function OtrosAccesos({ google }: { google: boolean }) {
+export function OtrosAccesos({ google }: { google: 'activo' | 'sin-configurar' | 'oculto' }) {
   const [estado, enviar, pendiente] = useActionState(pedirEnlaceDeAcceso, INICIAL);
 
   return (
@@ -29,16 +33,27 @@ export function OtrosAccesos({ google }: { google: boolean }) {
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
 
-      {google ? (
+      {google === 'activo' ? (
         <form action={entrarConGoogle}>
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center gap-2.5 rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
-          >
+          <button type="submit" className={`${BOTON_EXTERNO} hover:bg-accent`}>
             <GoogleIcono />
             Entrar con Google
           </button>
         </form>
+      ) : null}
+
+      {google === 'sin-configurar' ? (
+        <div className="space-y-1.5">
+          <button type="button" disabled className={`${BOTON_EXTERNO} opacity-50`}>
+            <GoogleIcono />
+            Entrar con Google
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Sólo en desarrollo: define <code>GOOGLE_CLIENT_ID</code> y{' '}
+            <code>GOOGLE_CLIENT_SECRET</code> para activarlo. En producción este botón no
+            aparece hasta que estén configurados.
+          </p>
+        </div>
       ) : null}
 
       <form action={enviar} className="space-y-3" noValidate>

@@ -81,10 +81,18 @@ test.describe('Entrar por otros medios', () => {
     await expect(page.getByText('verificación en dos pasos activada')).toBeVisible();
   });
 
-  test('sin credenciales de Google configuradas no se ofrece el botón', async ({ page }) => {
-    // Un entorno a medio configurar no debe enseñar un botón que falla al pulsarlo.
+  test('sin credenciales de Google el botón se ve pero no se puede pulsar', async ({
+    page,
+  }) => {
+    // En desarrollo se muestra desactivado, para poder revisar la pantalla sin
+    // tener que crear antes un proyecto en Google Cloud. Lo que no puede pasar
+    // es que se pueda pulsar y falle: en producción directamente no aparece.
     await page.goto('/acceso');
-    await expect(page.getByRole('button', { name: /Google/ })).toHaveCount(0);
+
+    const boton = page.getByRole('button', { name: /Google/ });
+    await expect(boton).toBeVisible();
+    await expect(boton).toBeDisabled();
+    await expect(page.getByText('Sólo en desarrollo')).toBeVisible();
   });
 });
 

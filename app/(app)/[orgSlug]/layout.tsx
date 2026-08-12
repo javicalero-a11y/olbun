@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
+import { COOKIE_TEMA, leerTema } from '@/lib/tema';
 import { getSessionContext } from '@/lib/auth/session';
 import { CabeceraApp } from '@/components/features/app/cabecera';
 
@@ -22,6 +24,8 @@ export default async function OrgLayout({
 
   if (!contexto) notFound();
 
+  const tema = leerTema((await cookies()).get(COOKIE_TEMA)?.value);
+
   return (
     <div className="flex min-h-dvh flex-col">
       <CabeceraApp
@@ -29,6 +33,7 @@ export default async function OrgLayout({
         organisations={contexto.organisations}
         user={contexto.user}
         rol={contexto.actor.role}
+        tema={tema}
       />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">{children}</main>
     </div>

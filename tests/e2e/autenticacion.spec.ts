@@ -75,7 +75,7 @@ test.describe('Registro y acceso', () => {
 
     await page.getByLabel('Correo electrónico').fill(cred.email);
     await page.getByLabel('Contraseña').fill(cred.password);
-    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe(ruta);
   });
@@ -98,7 +98,7 @@ test.describe('Registro y acceso', () => {
     await page.goto('/acceso');
     await page.getByLabel('Correo electrónico').fill('nadie@ejemplo.test');
     await page.getByLabel('Contraseña').fill('una-contrasena-cualquiera');
-    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
     await expect(page.locator('form [role="alert"]')).toContainText(
       'Correo o contraseña incorrectos',

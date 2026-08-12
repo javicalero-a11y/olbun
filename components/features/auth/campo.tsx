@@ -68,9 +68,10 @@ export function BotonEnviar({
       type="submit"
       disabled={pendiente}
       className={cn(
-        'w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground',
+        // The gradient marks the primary action. It appears here and on the
+        // marketing hero, nowhere else.
+        'boton-primario w-full',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-        'disabled:opacity-60',
       )}
     >
       {pendiente ? 'Un momento…' : children}

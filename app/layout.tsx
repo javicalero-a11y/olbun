@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { cookies } from 'next/headers';
+
+import { claseDe, COOKIE_TEMA, leerTema } from '@/lib/tema';
 
 import './globals.css';
 
@@ -21,15 +24,20 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0d1017' },
-  ],
+  // Matches the navy the app actually renders, so the browser chrome on iOS
+  // does not sit in a different colour from the page under it.
+  themeColor: '#0b1526',
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  // Read on the server so the class is in the first byte of HTML. Deciding
+  // this on the client would show every visitor a white flash first.
+  const tema = leerTema((await cookies()).get(COOKIE_TEMA)?.value);
+
   return (
-    <html lang="es-ES" suppressHydrationWarning>
+    <html lang="es-ES" className={claseDe(tema)} suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
     </html>
   );

@@ -6,43 +6,62 @@
  * Olbun design tokens (SPEC §9).
  *
  * Rules:
- *   1. A neutral slate foundation carries the entire interface.
- *   2. Exactly one brand accent (deep indigo) for interactive emphasis.
+ *   1. A navy foundation drawn from the logo (#002244) carries the interface.
+ *   2. Exactly one brand accent — the logo blue (#095bc9) — for interactive
+ *      emphasis, plus a single magenta reserved for the primary call to action
+ *      and the marketing hero. Magenta appears nowhere else; the moment it
+ *      decorates a third thing it stops meaning "this is the action".
  *   3. Every other colour is a *status* colour. If something on screen is red,
- *      it means something. Never decorate with semantic colour.
+ *      it means something. Never decorate with semantic colour. Note the
+ *      magenta sits at hue 350 and status red at 27, far enough apart to read
+ *      as different things side by side.
  *   4. Status is never encoded in colour alone — RAG chips pair the colour with
  *      a label or icon (WCAG 2.2 AA, SPEC §8).
+ *
+ * Dark is the default (the `.dark` class is on <html> unless someone opts out),
+ * so the values below are the light theme people switch *to*.
  */
 
 :root {
   --radius: 0.5rem;
 
-  --background: oklch(0.995 0 0);
-  --foreground: oklch(0.21 0.02 264);
+  --background: oklch(0.982 0 90);
+  --foreground: oklch(0.251 0.075 252);
 
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.45 0.16 264);
-  --primary-foreground: oklch(0.985 0.005 264);
+  --primary: oklch(0.497 0.186 259);
+  --primary-foreground: oklch(0.99 0.005 259);
 
-  --secondary: oklch(0.968 0.007 264);
-  --secondary-foreground: oklch(0.28 0.03 264);
+  --secondary: oklch(0.965 0.008 259);
+  --secondary-foreground: oklch(0.29 0.05 255);
 
-  --muted: oklch(0.968 0.007 264);
-  --muted-foreground: oklch(0.53 0.02 264);
+  --muted: oklch(0.965 0.008 259);
+  --muted-foreground: oklch(0.52 0.03 255);
 
-  --accent: oklch(0.955 0.012 264);
-  --accent-foreground: oklch(0.28 0.03 264);
+  --accent: oklch(0.95 0.015 259);
+  --accent-foreground: oklch(0.29 0.05 255);
 
   --destructive: oklch(0.55 0.21 27);
   --destructive-foreground: oklch(0.985 0.005 264);
 
-  --border: oklch(0.92 0.008 264);
-  --input: oklch(0.92 0.008 264);
-  --ring: oklch(0.45 0.16 264);
+  --border: oklch(0.9 0.012 259);
+  --input: oklch(0.9 0.012 259);
+  --ring: oklch(0.497 0.186 259);
+
+  /* The one magenta, and the gradient it forms with the brand blue. */
+  --brand-magenta: oklch(0.588 0.232 351);
+  --brand-blue: oklch(0.497 0.186 259);
+  --brand-navy: oklch(0.251 0.075 252);
+  --brand-gradient: linear-gradient(
+    100deg,
+    oklch(0.588 0.232 351) 0%,
+    oklch(0.52 0.21 300) 45%,
+    oklch(0.497 0.186 259) 100%
+  );
 
   /* Status semantics — RAG plus the neutral/info states used by StatusChip. */
   --status-green: oklch(0.55 0.13 152);
@@ -58,32 +77,46 @@
 }
 
 .dark {
-  --background: oklch(0.17 0.015 264);
-  --foreground: oklch(0.96 0.005 264);
+  /* Surfaces are the brand navy pulled down, not neutral grey, so the logo
+     sits on its own colour rather than on top of something borrowed. */
+  --background: oklch(0.165 0.035 252);
+  --foreground: oklch(0.965 0.006 255);
 
-  --card: oklch(0.21 0.018 264);
+  --card: oklch(0.205 0.04 253);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.21 0.018 264);
+  --popover: oklch(0.205 0.04 253);
   --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.68 0.14 264);
-  --primary-foreground: oklch(0.17 0.02 264);
+  /* Lifted well above the logo blue: #095bc9 on a navy background is too dark
+     to carry text at AA. */
+  --primary: oklch(0.7 0.16 257);
+  --primary-foreground: oklch(0.16 0.04 252);
 
-  --secondary: oklch(0.27 0.02 264);
-  --secondary-foreground: oklch(0.96 0.005 264);
+  --secondary: oklch(0.26 0.04 253);
+  --secondary-foreground: oklch(0.965 0.006 255);
 
-  --muted: oklch(0.27 0.02 264);
-  --muted-foreground: oklch(0.7 0.02 264);
+  --muted: oklch(0.26 0.04 253);
+  --muted-foreground: oklch(0.72 0.03 255);
 
-  --accent: oklch(0.3 0.025 264);
-  --accent-foreground: oklch(0.96 0.005 264);
+  --accent: oklch(0.29 0.045 253);
+  --accent-foreground: oklch(0.965 0.006 255);
 
-  --destructive: oklch(0.62 0.2 27);
+  --destructive: oklch(0.65 0.2 27);
   --destructive-foreground: oklch(0.98 0.005 264);
 
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.68 0.14 264);
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: oklch(0.7 0.16 257);
+
+  --brand-magenta: oklch(0.68 0.22 351);
+  --brand-blue: oklch(0.7 0.16 257);
+  --brand-navy: oklch(0.165 0.035 252);
+  --brand-gradient: linear-gradient(
+    100deg,
+    oklch(0.66 0.23 351) 0%,
+    oklch(0.6 0.21 300) 45%,
+    oklch(0.58 0.19 262) 100%
+  );
 
   --status-green: oklch(0.72 0.15 152);
   --status-green-subtle: oklch(0.3 0.06 152);
@@ -129,6 +162,10 @@
   --color-status-info: var(--status-info);
   --color-status-info-subtle: var(--status-info-subtle);
 
+  --color-brand-magenta: var(--brand-magenta);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-navy: var(--brand-navy);
+
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -158,6 +195,39 @@
 
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+@layer components {
+  /*
+   * The primary action, and the only place the magenta gradient appears
+   * besides the marketing hero. Reserving it is what makes it mean "this is
+   * the thing to press" rather than "this is decorated".
+   */
+  .boton-primario {
+    background-image: var(--brand-gradient);
+    @apply rounded-md px-4 py-2 text-sm font-medium text-white;
+    @apply transition-[filter,transform] duration-150;
+  }
+
+  .boton-primario:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  .boton-primario:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  /* The marketing hero wash. Sits behind content, never carries text itself. */
+  .fondo-degradado {
+    background-image: var(--brand-gradient);
+  }
+
+  .texto-degradado {
+    background-image: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   @media (prefers-reduced-motion: reduce) {
