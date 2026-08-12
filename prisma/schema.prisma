@@ -115,6 +115,9 @@ model Organisation {
   plantillas           PlantillaProcedimiento[]
   expedientes          Expediente[]
   auditEvents          AuditEvent[]
+  buzones              BuzonConectado[]
+  comunicaciones       Comunicacion[]
+  adjuntos             Adjunto[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -588,6 +591,9 @@ model Contrato {
   modificados      Modificado[]
   expedientes      Expediente[]
 
+  buzones        BuzonConectado[]
+  comunicaciones Comunicacion[]
+
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
   @@index([organisationId, deletedAt])
@@ -840,6 +846,8 @@ model Expediente {
   plazos       Plazo[]
   actuaciones  Actuacion[]
 
+  comunicaciones Comunicacion[]
+
   @@unique([organisationId, referencia])
   @@index([organisationId, estado])
   @@index([organisationId, deletedAt])
@@ -998,4 +1006,159 @@ model AuditEvent {
   @@index([organisationId, entidad, entidadId])
   @@index([organisationId, actorId, createdAt])
   @@map("audit_events")
+}
+
+/// How correspondence reached us. Manual upload and forwarding alias are the
+/// two that need no OAuth; the mailbox types arrive in M8.
+enum TipoBuzon {
+  CARGA_MANUAL
+  ALIAS_REENVIO
+  MS365_FUNCIONAL
+  GOOGLE_FUNCIONAL
+  IMAP
+}
+
+enum DireccionComunicacion {
+  ENTRANTE
+  SALIENTE
+}
+
+enum EstadoRevisionComunicacion {
+  SIN_REVISAR
+  REVISADA
+  ARCHIVADA
+}
+
+/// A source of correspondence (SPEC §4.3).
+///
+/// `politicaInternaDocumentoId` and `consultaRepresentacionFechaId` are the
+/// lawful-basis paperwork for reading a named person's mailbox (LOPDGDD art.
+/// 87). They are nullable here because manual upload and a shared alias need
+/// neither; the service layer refuses to connect a personal mailbox without
+/// them, which is where that rule can actually be enforced.
+model BuzonConectado {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  tipo      TipoBuzon
+  nombre    String
+  direccion String?
+
+  contratoId String?
+
+  estadoOAuth          String?
+  ultimaSincronizacion DateTime?
+
+  politicaInternaDocumentoId    String?
+  consultaRepresentacionFechaId String?
+
+  activo Boolean @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato       Contrato?      @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  comunicaciones Comunicacion[]
+
+  @@index([organisationId, tipo])
+  @@map("buzones_conectados")
+}
+
+/// One message (SPEC §4.3).
+///
+/// Deduplication hangs on two columns, because neither alone is enough. The
+/// RFC Message-ID is authoritative when present, but forwarded mail and PDFs
+/// of printed mail often have none — so `huella` carries a hash of the parts
+/// that identify a message regardless. Both are unique per organisation, and
+/// uniqueness is the database's job rather than a check-then-insert that two
+/// concurrent uploads would both pass.
+model Comunicacion {
+  id             String @id @default(cuid(2))
+  organisationId String
+  buzonId        String
+
+  /// From the RFC 5322 header. Null when the source had none.
+  messageIdRFC String?
+  /// sha256 of sender + subject + date + body, for sources without a Message-ID.
+  huella       String
+  threadId     String?
+
+  direccion DireccionComunicacion
+  de        String
+  para      String[]
+  cc        String[]
+  asunto    String
+
+  fechaEnvio     DateTime?
+  fechaRecepcion DateTime
+
+  cuerpoTexto          String?
+  cuerpoHtmlSanitizado String?
+
+  contratoId           String?
+  expedienteId         String?
+  /// 0–1. How sure the automatic contract match is; 1 means a person chose it.
+  confianzaVinculacion Float?
+
+  estadoRevision EstadoRevisionComunicacion @default(SIN_REVISAR)
+  esConfidencial Boolean                    @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  buzon        BuzonConectado @relation(fields: [buzonId], references: [id], onDelete: Cascade)
+  contrato     Contrato?      @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente   Expediente?    @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  adjuntos     Adjunto[]
+
+  @@unique([organisationId, messageIdRFC])
+  @@unique([organisationId, huella])
+  @@index([organisationId, fechaRecepcion])
+  @@index([organisationId, estadoRevision])
+  @@index([contratoId])
+  @@map("comunicaciones")
+}
+
+enum EstadoAntivirus {
+  PENDIENTE
+  LIMPIO
+  INFECTADO
+  NO_ANALIZADO
+}
+
+/// An attachment's identity, not yet its bytes.
+///
+/// Object storage, antivirus and text extraction are M9. Until then the
+/// metadata and the hash are recorded so nothing about what arrived is lost,
+/// and `storageKey` stays null rather than pointing at somewhere that does not
+/// exist yet.
+model Adjunto {
+  id             String @id @default(cuid(2))
+  organisationId String
+  comunicacionId String
+
+  nombre   String
+  mimeType String
+  tamano   Int
+  sha256   String
+
+  storageKey      String?
+  estadoAntivirus EstadoAntivirus @default(NO_ANALIZADO)
+  textoExtraido   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  comunicacion Comunicacion @relation(fields: [comunicacionId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, comunicacionId])
+  @@map("adjuntos")
 }

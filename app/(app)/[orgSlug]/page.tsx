@@ -42,6 +42,7 @@ const AREAS: Area[] = [
     descripcion: 'Bandeja de correspondencia vinculada a cada contrato.',
     hito: 'M6',
     permiso: 'comunicacion:view',
+    ruta: 'comunicaciones',
   },
   {
     titulo: 'Detecciones',
