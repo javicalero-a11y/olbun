@@ -128,15 +128,18 @@ Conventional Commits, scope from the list in `commitlint.config.mjs`, e.g.
 
 Carried deliberately; each has an owner milestone.
 
-| Gap                                                                                                               | Owner      |
-| ----------------------------------------------------------------------------------------------------------------- | ---------- |
-| CSP still allows `'unsafe-inline'` for styles and scripts (Next inlines critical CSS); needs a nonce-based policy | M13        |
-| Next 15 → 16 and Prisma 6 → 7 upgrades ([ADR 0002](docs/adr/0002-runtime-and-framework-versions.md))              | M13        |
-| No `next-intl` yet; strings are inline. Must be routed through the translation layer as the app shell lands       | M2         |
-| No Testcontainers harness yet — nothing to integration-test until server actions exist                            | M1         |
-| Redis and MinIO absent from Docker Compose                                                                        | M5 / M6    |
-| Coverage thresholds are configured but `lib/` is nearly empty, so they prove little yet                           | M1 onwards |
-| Health endpoint checks Postgres only; Redis and S3 checks to be added with those dependencies                     | M6         |
+| Gap                                                                                                                                                                | Owner      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| CSP still allows `'unsafe-inline'` for styles and scripts (Next inlines critical CSS); needs a nonce-based policy                                                  | M13        |
+| Next 15 → 16 and Prisma 6 → 7 upgrades ([ADR 0002](docs/adr/0002-runtime-and-framework-versions.md))                                                               | M13        |
+| No `next-intl` yet; strings are inline. Must be routed through the translation layer as the app shell lands                                                        | M2         |
+| No Testcontainers harness yet — nothing to integration-test until server actions exist                                                                             | M1         |
+| Redis and MinIO absent from Docker Compose                                                                                                                         | M5 / M6    |
+| Coverage thresholds are configured but `lib/` is nearly empty, so they prove little yet                                                                            | M1 onwards |
+| Health endpoint checks Postgres only; Redis and S3 checks to be added with those dependencies                                                                      | M6         |
+| The magic-link round trip is not covered end to end: Auth.js stores only a hash of the token, so a test cannot rebuild the emailed link. Needs a mail-capture seam | M6         |
+| Google sign-in is untested against real Google: it needs a Cloud project, so only the "no credentials, no button" path is covered                                  | —          |
+| No production mail transport; `lib/mail` throws outside development. Blocks both invitations and magic links in a deployed environment                             | M6         |
 
 ## Open decisions
 

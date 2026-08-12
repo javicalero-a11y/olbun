@@ -27,6 +27,29 @@ export const authConfig = {
     updateAge: 15 * 60,
   },
   callbacks: {
+    /**
+     * Where a completed sign-in lands.
+     *
+     * Auth.js refuses an absolute callback URL whose origin is not its own —
+     * correctly, since that is how open redirects happen. Its default is then
+     * to fall back to the site root, which drops somebody who has just proved
+     * who they are onto the marketing page. `/bienvenida` is the honest
+     * fallback: it works out where they actually belong and sends them on.
+     *
+     * The origin comparison stays strict; only the fallback changes.
+     */
+    redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {
+        // Not a URL at all; treat it like any other rejected destination.
+      }
+
+      return `${baseUrl}/bienvenida`;
+    },
+
     authorized({ auth, request }) {
       const isSignedIn = Boolean(auth?.user);
       const { pathname } = request.nextUrl;
