@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { requirePermission } from '@/lib/auth/guardias';
 import { tenantClient } from '@/lib/db/tenant';
 import { ETIQUETA_ROL } from '@/lib/auth/etiquetas';
+import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 
 export const metadata: Metadata = { title: 'Auditoría' };
 
@@ -52,72 +53,70 @@ export default async function AuditoriaPage({
         </p>
       </div>
 
-      {eventos.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <h2 className="text-sm font-semibold">Todavía no hay eventos</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Cada alta, cambio y borrado queda aquí en cuanto alguien empiece a trabajar.
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left">
-            <caption className="sr-only">
-              Eventos de auditoría, del más reciente al más antiguo
-            </caption>
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Cuándo
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Quién
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Qué
-                </th>
-                <th scope="col" className="pb-2 font-medium">
-                  Sobre
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {eventos.map((evento) => {
-                const tipo = ETIQUETA_TIPO[evento.tipo];
-
-                return (
-                  <tr
-                    key={evento.id}
-                    className="border-b border-border align-top last:border-0"
-                  >
-                    <td className="py-2.5 pr-4 text-xs whitespace-nowrap" data-numeric>
-                      {fechaHora(evento.createdAt)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-xs">
-                      {evento.actorEmail ?? '—'}
-                      {evento.actorRol ? (
-                        <span className="block text-muted-foreground">
-                          {ETIQUETA_ROL[evento.actorRol]}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-2.5 pr-4 text-xs">
-                      <span className={`font-medium ${tipo?.clase ?? ''}`}>
-                        {tipo?.texto ?? evento.tipo}
-                      </span>
-                      <span className="block text-muted-foreground">{evento.accion}</span>
-                    </td>
-                    <td className="py-2.5 text-xs">
-                      {evento.descripcion ?? evento.entidad}
-                      <span className="block text-muted-foreground">{evento.entidad}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Tabla
+        titulo="Eventos de auditoría, del más reciente al más antiguo"
+        anchoMinimo="820px"
+        filas={eventos}
+        claveDeFila={(evento) => evento.id}
+        vacio={
+          <EstadoVacio
+            titulo="Todavía no hay eventos"
+            explicacion="Cada alta, cambio y borrado queda aquí en cuanto alguien empiece a trabajar."
+          />
+        }
+        columnas={[
+          {
+            clave: 'cuando',
+            encabezado: 'Cuándo',
+            numerica: true,
+            clase: 'whitespace-nowrap text-xs',
+            celda: (evento) => fechaHora(evento.createdAt),
+          },
+          {
+            clave: 'quien',
+            encabezado: 'Quién',
+            clase: 'text-xs',
+            celda: (evento) => (
+              <>
+                {evento.actorEmail ?? '—'}
+                {evento.actorRol ? (
+                  <span className="block text-muted-foreground">
+                    {ETIQUETA_ROL[evento.actorRol]}
+                  </span>
+                ) : null}
+              </>
+            ),
+          },
+          {
+            clave: 'que',
+            encabezado: 'Qué',
+            clase: 'text-xs',
+            celda: (evento) => {
+              const tipo = ETIQUETA_TIPO[evento.tipo];
+              return (
+                <>
+                  <span className={`font-medium ${tipo?.clase ?? ''}`}>
+                    {tipo?.texto ?? evento.tipo}
+                  </span>
+                  <span className="block text-muted-foreground">{evento.accion}</span>
+                </>
+              );
+            },
+          },
+          {
+            clave: 'sobre',
+            encabezado: 'Sobre',
+            esCabeceraDeFila: true,
+            clase: 'text-xs',
+            celda: (evento) => (
+              <>
+                {evento.descripcion ?? evento.entidad}
+                <span className="block text-muted-foreground">{evento.entidad}</span>
+              </>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

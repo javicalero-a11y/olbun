@@ -11,7 +11,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 1 : undefined,
+  // Capped locally rather than left to the core count. `reuseExistingServer`
+  // attaches these runs to the *dev* server, which compiles each route the
+  // first time it is asked for; six workers demanding six cold routes at once
+  // pushes the first request past the 5s assertion timeout and produces
+  // failures that look like product bugs and are not. CI builds for production
+  // first and runs single-file, so it never sees this.
+  workers: isCI ? 1 : 3,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   timeout: 30_000,
   expect: { timeout: 5_000 },

@@ -62,11 +62,19 @@ test.describe('Auditoría', () => {
     // Un órgano y un contrato, por las pantallas de verdad.
     await page.goto(`/${cred.slug}/contratos/organos/nuevo`);
     await page.getByLabel('Nombre del órgano').fill('Ayuntamiento de Prueba');
-    await page.getByRole('button', { name: 'Guardar órgano' }).click();
 
     // Saving an authority stays on the page rather than redirecting, so there
-    // is no navigation to wait on. Wait for the thing the next step actually
-    // needs: the authority available to be chosen.
+    // is no navigation to wait on — and navigating away too early aborts the
+    // in-flight request, which is why this looked intermittent. Waiting on the
+    // button's pending state is not enough either: the assertion can run
+    // before React has marked it pending. Wait for the POST itself, armed
+    // before the click so the response cannot be missed.
+    const guardado = page.waitForResponse(
+      (respuesta) => respuesta.request().method() === 'POST' && respuesta.status() < 400,
+    );
+    await page.getByRole('button', { name: 'Guardar órgano' }).click();
+    await guardado;
+
     await page.goto(`/${cred.slug}/contratos/nuevo`);
     await expect(page.getByLabel('Órgano de contratación')).toContainText(
       'Ayuntamiento de Prueba',

@@ -12,6 +12,7 @@ import {
 } from '@/lib/domain/contratos/etiquetas';
 import { formatearEs, hoyEn, type FechaCivil } from '@/lib/domain/fecha';
 import { EtiquetaAviso } from '@/components/features/contratos/aviso';
+import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 
 export const metadata: Metadata = { title: 'Contratos' };
 
@@ -96,100 +97,90 @@ export default async function ContratosPage({
         ) : null}
       </div>
 
-      {contratos.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <h2 className="text-sm font-semibold">Aquí vivirán tus contratos públicos</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Cada contrato reúne su órgano de contratación, sus fechas y sus importes, y es de
-            donde cuelgan después los expedientes, los plazos y las incidencias. Registrar las
-            fechas de fin y el preaviso de prórroga es lo que permite avisarte antes de perder
-            una renovación.
-          </p>
-          {puedeCrear ? (
-            <Link
-              href={`/${orgSlug}/contratos/nuevo`}
-              className="mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4"
-            >
-              Registrar el primero
-            </Link>
-          ) : null}
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left">
-            <caption className="sr-only">Contratos de la organización</caption>
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Expediente
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Órgano
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Estado
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Fin
-                </th>
-                <th scope="col" className="pr-4 pb-2 text-right font-medium">
-                  Importe
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map(({ contrato, fin, aviso }) => {
-                const estado = ETIQUETA_ESTADO_CONTRATO[contrato.estado];
-
-                return (
-                  <tr
-                    key={contrato.id}
-                    className="border-b border-border align-top last:border-0"
-                  >
-                    <td className="py-3 pr-4">
-                      <Link
-                        href={`/${orgSlug}/contratos/${contrato.id}`}
-                        className="text-sm font-medium underline-offset-4 hover:underline"
-                      >
-                        {contrato.numeroExpediente}
-                      </Link>
-                      <p className="mt-0.5 max-w-md text-xs text-muted-foreground">
-                        {contrato.objeto}
-                      </p>
-                      {aviso ? (
-                        <p className="mt-1">
-                          <EtiquetaAviso aviso={aviso} />
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="py-3 pr-4 text-xs text-muted-foreground">
-                      {contrato.poderAdjudicador.nombre}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-medium ${estado.clase}`}>
-                        {estado.texto}
-                      </span>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {ETIQUETA_TIPO_CONTRATO[contrato.tipo]}
-                      </p>
-                    </td>
-                    <td className="py-3 pr-4 text-xs" data-numeric>
-                      {fin ? formatearEs(fin) : '—'}
-                    </td>
-                    <td className="py-3 text-right text-xs" data-numeric>
-                      {formatearEuros(
-                        contrato.importeAdjudicacion
-                          ? Number(contrato.importeAdjudicacion)
-                          : null,
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Tabla
+        titulo="Contratos de la organización, ordenados por urgencia del aviso más próximo"
+        filas={filas}
+        claveDeFila={({ contrato }) => contrato.id}
+        vacio={
+          <EstadoVacio
+            titulo="Aquí vivirán tus contratos públicos"
+            explicacion="Cada contrato reúne su órgano de contratación, sus fechas y sus importes, y es de donde cuelgan después los expedientes, los plazos y las incidencias. Registrar las fechas de fin y el preaviso de prórroga es lo que permite avisarte antes de perder una renovación."
+            accion={
+              puedeCrear ? (
+                <Link
+                  href={`/${orgSlug}/contratos/nuevo`}
+                  className="text-sm font-medium text-foreground underline underline-offset-4"
+                >
+                  Registrar el primero
+                </Link>
+              ) : null
+            }
+          />
+        }
+        columnas={[
+          {
+            clave: 'expediente',
+            encabezado: 'Expediente',
+            esCabeceraDeFila: true,
+            celda: ({ contrato, aviso }) => (
+              <>
+                <Link
+                  href={`/${orgSlug}/contratos/${contrato.id}`}
+                  className="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  {contrato.numeroExpediente}
+                </Link>
+                <p className="mt-0.5 max-w-md text-xs text-muted-foreground">
+                  {contrato.objeto}
+                </p>
+                {aviso ? (
+                  <p className="mt-1">
+                    <EtiquetaAviso aviso={aviso} />
+                  </p>
+                ) : null}
+              </>
+            ),
+          },
+          {
+            clave: 'organo',
+            encabezado: 'Órgano',
+            clase: 'text-xs text-muted-foreground',
+            celda: ({ contrato }) => contrato.poderAdjudicador.nombre,
+          },
+          {
+            clave: 'estado',
+            encabezado: 'Estado',
+            celda: ({ contrato }) => {
+              const estado = ETIQUETA_ESTADO_CONTRATO[contrato.estado];
+              return (
+                <>
+                  <span className={`text-xs font-medium ${estado.clase}`}>{estado.texto}</span>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {ETIQUETA_TIPO_CONTRATO[contrato.tipo]}
+                  </p>
+                </>
+              );
+            },
+          },
+          {
+            clave: 'fin',
+            encabezado: 'Fin',
+            numerica: true,
+            clase: 'text-xs',
+            celda: ({ fin }) => (fin ? formatearEs(fin) : '—'),
+          },
+          {
+            clave: 'importe',
+            encabezado: 'Importe',
+            numerica: true,
+            clase: 'text-xs',
+            celda: ({ contrato }) =>
+              formatearEuros(
+                contrato.importeAdjudicacion ? Number(contrato.importeAdjudicacion) : null,
+              ),
+          },
+        ]}
+      />
     </div>
   );
 }

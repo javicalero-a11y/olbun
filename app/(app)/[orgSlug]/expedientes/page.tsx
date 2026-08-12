@@ -12,6 +12,7 @@ import {
 import { formatearEuros } from '@/lib/domain/contratos/etiquetas';
 import { hoyEn, type FechaCivil } from '@/lib/domain/fecha';
 import { EtiquetaPlazo } from '@/components/features/expedientes/aviso-plazo';
+import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 
 export const metadata: Metadata = { title: 'Expedientes' };
 
@@ -123,94 +124,86 @@ export default async function ExpedientesPage({
         </div>
       </div>
 
-      {expedientes.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <h2 className="text-sm font-semibold">Aquí vivirán tus expedientes</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Una penalidad, un recurso, un impago o un despido: cada uno se abre desde una
-            plantilla de procedimiento, que crea de golpe todos sus hitos y calcula sus plazos
-            con el fundamento legal al lado de cada fecha.
-          </p>
-          {puedeCrear ? (
-            <Link
-              href={`/${orgSlug}/expedientes/nuevo`}
-              className="mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4"
-            >
-              Abrir el primero
-            </Link>
-          ) : null}
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
-            <caption className="sr-only">
-              Expedientes de la organización, ordenados por urgencia del plazo más próximo
-            </caption>
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Referencia
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Tipo
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Contrato
-                </th>
-                <th scope="col" className="pr-4 pb-2 font-medium">
-                  Estado
-                </th>
-                <th scope="col" className="pb-2 text-right font-medium">
-                  Cuantía
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map(({ expediente, aviso }) => {
-                const estado = ETIQUETA_ESTADO_EXPEDIENTE[expediente.estado];
-
-                return (
-                  <tr
-                    key={expediente.id}
-                    className="border-b border-border align-top last:border-0"
-                  >
-                    <td className="py-3 pr-4">
-                      <Link
-                        href={`/${orgSlug}/expedientes/${expediente.id}`}
-                        className="text-sm font-medium underline-offset-4 hover:underline"
-                      >
-                        {expediente.referencia}
-                      </Link>
-                      <p className="mt-0.5 max-w-md text-xs text-muted-foreground">
-                        {expediente.titulo}
-                      </p>
-                      {aviso ? (
-                        <p className="mt-1">
-                          <EtiquetaPlazo aviso={aviso} />
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="py-3 pr-4 text-xs text-muted-foreground">
-                      {ETIQUETA_TIPO_EXPEDIENTE[expediente.tipo] ?? expediente.tipo}
-                    </td>
-                    <td className="py-3 pr-4 text-xs text-muted-foreground">
-                      {expediente.contrato?.numeroExpediente ?? '—'}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-medium ${estado?.clase ?? ''}`}>
-                        {estado?.texto ?? expediente.estado}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right text-xs" data-numeric>
-                      {formatearEuros(expediente.cuantia ? Number(expediente.cuantia) : null)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Tabla
+        titulo="Expedientes de la organización, ordenados por urgencia del plazo más próximo"
+        anchoMinimo="760px"
+        filas={filas}
+        claveDeFila={({ expediente }) => expediente.id}
+        vacio={
+          <EstadoVacio
+            titulo="Aquí vivirán tus expedientes"
+            explicacion="Una penalidad, un recurso, un impago o un despido: cada uno se abre desde una plantilla de procedimiento, que crea de golpe todos sus hitos y calcula sus plazos con el fundamento legal al lado de cada fecha."
+            accion={
+              puedeCrear ? (
+                <Link
+                  href={`/${orgSlug}/expedientes/nuevo`}
+                  className="text-sm font-medium text-foreground underline underline-offset-4"
+                >
+                  Abrir el primero
+                </Link>
+              ) : null
+            }
+          />
+        }
+        columnas={[
+          {
+            clave: 'referencia',
+            encabezado: 'Referencia',
+            esCabeceraDeFila: true,
+            celda: ({ expediente, aviso }) => (
+              <>
+                <Link
+                  href={`/${orgSlug}/expedientes/${expediente.id}`}
+                  className="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  {expediente.referencia}
+                </Link>
+                <p className="mt-0.5 max-w-md text-xs text-muted-foreground">
+                  {expediente.titulo}
+                </p>
+                {aviso ? (
+                  <p className="mt-1">
+                    <EtiquetaPlazo aviso={aviso} />
+                  </p>
+                ) : null}
+              </>
+            ),
+          },
+          {
+            clave: 'tipo',
+            encabezado: 'Tipo',
+            clase: 'text-xs text-muted-foreground',
+            celda: ({ expediente }) =>
+              ETIQUETA_TIPO_EXPEDIENTE[expediente.tipo] ?? expediente.tipo,
+          },
+          {
+            clave: 'contrato',
+            encabezado: 'Contrato',
+            clase: 'text-xs text-muted-foreground',
+            celda: ({ expediente }) => expediente.contrato?.numeroExpediente ?? '—',
+          },
+          {
+            clave: 'estado',
+            encabezado: 'Estado',
+            celda: ({ expediente }) => {
+              const estado = ETIQUETA_ESTADO_EXPEDIENTE[expediente.estado];
+              return (
+                <span className={`text-xs font-medium ${estado?.clase ?? ''}`}>
+                  {estado?.texto ?? expediente.estado}
+                </span>
+              );
+            },
+          },
+          {
+            clave: 'cuantia',
+            encabezado: 'Cuantía',
+            numerica: true,
+            clase: 'text-xs',
+            celda: ({ expediente }) =>
+              formatearEuros(expediente.cuantia ? Number(expediente.cuantia) : null),
+          },
+        ]}
+      />
     </div>
   );
 }
