@@ -21,7 +21,9 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  'upgrade-insecure-requests',
+  // Production only. Over a plaintext dev server this tells the browser to
+  // rewrite every http:// request to https://, which nothing is listening for.
+  isDev ? '' : 'upgrade-insecure-requests',
 ]
   .filter(Boolean)
   .join('; ');
@@ -32,10 +34,19 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload',
-  },
+  // Also production only, and for a sharper reason: sent from a plaintext dev
+  // server it pins localhost to HTTPS in the browser for two years, and
+  // `includeSubDomains` drags every other local project down with it. The
+  // browser keeps honouring it long after the server stops sending it, so the
+  // only cure is clearing the browser's HSTS store by hand.
+  ...(isDev
+    ? []
+    : [
+        {
+          key: 'Strict-Transport-Security',
+          value: 'max-age=63072000; includeSubDomains; preload',
+        },
+      ]),
 ];
 
 const nextConfig: NextConfig = {
