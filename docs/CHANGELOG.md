@@ -4,6 +4,19 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M5 — Expedientes, plazos y cronograma (2026-08-12)
+
+- Modelo de expedientes: plantillas de procedimiento, hitos, plazos y actuaciones,
+  con RLS en las seis tablas nuevas.
+- Cuatro plantillas de sistema (penalidad, recurso especial, impago, despido), que
+  ahora se siembran al registrar cada organización nueva.
+- `planificarPasos`: encadena las fechas paso a paso — el plazo para recurrir
+  arranca de la resolución, no de la apertura — y marca como incompleto todo lo
+  que cuelga de una fecha estimada.
+- Pantallas de expedientes (lista, alta y detalle) y de plazos, con cronograma
+  y su tabla equivalente siempre visible.
+- La navegación de secciones ya no se oculta en móvil.
+
 ## [Unreleased]
 
 ### M1 — Identity & tenancy (en curso)

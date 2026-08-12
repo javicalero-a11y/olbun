@@ -112,6 +112,8 @@ model Organisation {
   accessGrants         AccessGrant[]
   poderesAdjudicadores PoderAdjudicador[]
   contratos            Contrato[]
+  plantillas           PlantillaProcedimiento[]
+  expedientes          Expediente[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -583,6 +585,7 @@ model Contrato {
   organisation     Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   poderAdjudicador PoderAdjudicador @relation(fields: [poderAdjudicadorId], references: [id], onDelete: Restrict)
   modificados      Modificado[]
+  expedientes      Expediente[]
 
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
@@ -620,4 +623,317 @@ model Modificado {
   @@index([organisationId, contratoId])
   @@index([organisationId, estado])
   @@map("modificados")
+}
+
+// ---------------------------------------------------------------------------
+// M5 — Expedientes, hitos y plazos
+// ---------------------------------------------------------------------------
+
+enum Jurisdiccion {
+  ADMINISTRATIVA
+  CONTENCIOSO_ADMINISTRATIVA
+  SOCIAL
+  CIVIL
+  PENAL
+  ARBITRAJE
+  EXTRAJUDICIAL
+}
+
+enum TipoExpediente {
+  // Vía contractual
+  PENALIDAD
+  EXPEDIENTE_SANCIONADOR
+  RESOLUCION_CONTRATO
+  MODIFICADO
+  REEQUILIBRIO_ECONOMICO
+  REVISION_PRECIOS
+  LIQUIDACION
+  DEVOLUCION_GARANTIA
+  IMPAGO_MOROSIDAD
+  // Vía de impugnación
+  RECURSO_ESPECIAL_CONTRATACION
+  RECURSO_ALZADA
+  RECURSO_REPOSICION
+  RECURSO_CONTENCIOSO
+  // Vía laboral
+  SUBROGACION
+  DESPIDO
+  RECLAMACION_CANTIDAD
+  CONFLICTO_COLECTIVO
+  SANCION_ITSS
+  // Terceros
+  RESPONSABILIDAD_PATRIMONIAL
+  RECLAMACION_TERCERO
+}
+
+enum EstadoExpediente {
+  BORRADOR
+  ABIERTO
+  EN_TRAMITE
+  SUSPENDIDO
+  PENDIENTE_RESOLUCION
+  RESUELTO
+  RECURRIDO
+  ARCHIVADO
+}
+
+enum SentidoResolucion {
+  ESTIMATORIA_TOTAL
+  ESTIMATORIA_PARCIAL
+  DESESTIMATORIA
+  ALLANAMIENTO
+  DESISTIMIENTO
+  ACUERDO
+  CADUCIDAD
+  INADMISION
+}
+
+enum TipoHito {
+  RECEPCION_NOTIFICACION
+  PRESENTACION_ESCRITO
+  PRUEBA
+  VISTA_JUICIO
+  RESOLUCION
+  PAGO
+  ACTUACION_INTERNA
+}
+
+enum EstadoHito {
+  PENDIENTE
+  EN_CURSO
+  CUMPLIDO
+  VENCIDO
+  NO_APLICA
+}
+
+/// Mirrors the `Computo` union in lib/domain/plazos. The two are kept in step
+/// by a test that compares them.
+enum ComputoPlazo {
+  HABILES_ADMINISTRATIVO
+  HABILES_JUDICIAL
+  NATURALES
+  MESES
+  ANOS
+}
+
+enum EstadoPlazo {
+  VIGENTE
+  CUMPLIDO
+  VENCIDO
+  SUSPENDIDO
+  AMPLIADO
+}
+
+/// A procedure template: the standard sequence of steps for one kind of
+/// expediente. Opening an expediente instantiates its template, so the whole
+/// timeline exists from minute one instead of being typed in by hand. This is
+/// where the product's leverage lives.
+model PlantillaProcedimiento {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nombre       String
+  tipo         TipoExpediente
+  jurisdiccion Jurisdiccion
+  descripcion  String?
+  /// Templates seeded by Olbun are shared starting points; a tenant may edit
+  /// them, at which point they own the copy.
+  esDelSistema Boolean        @default(false)
+  activa       Boolean        @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organisation Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  hitos        PlantillaHito[]
+  expedientes  Expediente[]
+
+  @@unique([organisationId, tipo, nombre])
+  @@index([organisationId, tipo])
+  @@map("plantillas_procedimiento")
+}
+
+model PlantillaHito {
+  id             String @id @default(cuid(2))
+  organisationId String
+  plantillaId    String
+
+  orden       Int
+  nombre      String
+  tipo        TipoHito
+  descripcion String?
+
+  /// When set, instantiating this step also creates a Plazo.
+  plazoCantidad      Int?
+  plazoComputo       ComputoPlazo?
+  /// The article this deadline rests on, shown next to every date.
+  plazoFundamento    String?
+  /// Missing a preclusive deadline forfeits the right; the UI must shout.
+  plazoEsPreclusivo  Boolean       @default(false)
+  /// Days after the previous milestone, when the step has no legal deadline.
+  desplazamientoDias Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plantilla PlantillaProcedimiento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+
+  @@unique([plantillaId, orden])
+  @@index([organisationId, plantillaId])
+  @@map("plantillas_hito")
+}
+
+model Expediente {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  /// Auto-numbered per organisation: EXP-2026-0001.
+  referencia String
+  titulo     String
+  resumen    String?
+
+  tipo         TipoExpediente
+  jurisdiccion Jurisdiccion
+  estado       EstadoExpediente @default(ABIERTO)
+
+  contratoId  String?
+  plantillaId String?
+
+  /// Free text plus a coarse type, because the exact body varies enormously.
+  organoCompetente String?
+  numeroAutos      String?
+  parteContraria   String?
+
+  cuantia              Decimal? @db.Decimal(14, 2)
+  cuantiaIndeterminada Boolean  @default(false)
+  provisionContable    Decimal? @db.Decimal(14, 2)
+
+  /// Aligned with accounting provision criteria rather than invented scales.
+  probabilidadExito String?
+
+  responsableInternoId String?
+  despachoExterno      String?
+
+  fechaApertura   DateTime           @db.Date
+  fechaResolucion DateTime?          @db.Date
+  sentido         SentidoResolucion?
+
+  importeReclamado  Decimal? @db.Decimal(14, 2)
+  importePagado     Decimal? @db.Decimal(14, 2)
+  importeRecuperado Decimal? @db.Decimal(14, 2)
+
+  esConfidencial Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato     Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  plantilla    PlantillaProcedimiento? @relation(fields: [plantillaId], references: [id], onDelete: SetNull)
+  hitos        Hito[]
+  plazos       Plazo[]
+  actuaciones  Actuacion[]
+
+  @@unique([organisationId, referencia])
+  @@index([organisationId, estado])
+  @@index([organisationId, deletedAt])
+  @@index([contratoId])
+  @@map("expedientes")
+}
+
+model Hito {
+  id             String @id @default(cuid(2))
+  organisationId String
+  expedienteId   String
+
+  orden       Int
+  nombre      String
+  tipo        TipoHito
+  descripcion String?
+  estado      EstadoHito @default(PENDIENTE)
+
+  fechaPrevista DateTime? @db.Date
+  fechaReal     DateTime? @db.Date
+
+  responsableId String?
+  notas         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  expediente Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  plazo      Plazo?
+
+  @@index([organisationId, expedienteId, orden])
+  @@map("hitos")
+}
+
+model Plazo {
+  id             String  @id @default(cuid(2))
+  organisationId String
+  expedienteId   String
+  hitoId         String? @unique
+
+  descripcion String
+  /// Always shown beside the date, e.g. "art. 50.1 LCSP — 15 días hábiles".
+  fundamento  String
+
+  fechaInicio DateTime     @db.Date
+  cantidad    Int
+  computo     ComputoPlazo
+
+  /// What the engine computed, and what a person confirmed. They are kept
+  /// apart deliberately: an unconfirmed date is never treated as firm.
+  fechaVencimientoCalculada  DateTime  @db.Date
+  fechaVencimientoConfirmada DateTime? @db.Date
+  confirmadaPorId            String?
+  confirmadaEn               DateTime?
+
+  /// False when a calendar the calculation depended on was missing or
+  /// unverified. Such a deadline must be shown with its warning.
+  calculoCompleto Boolean  @default(false)
+  advertencias    String[]
+  /// The days the engine skipped and why, so the result can be audited.
+  diasExcluidos   Json?
+
+  esPreclusivo Boolean     @default(false)
+  estado       EstadoPlazo @default(VIGENTE)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  expediente Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  hito       Hito?      @relation(fields: [hitoId], references: [id], onDelete: SetNull)
+
+  @@index([organisationId, expedienteId])
+  @@index([organisationId, estado, fechaVencimientoCalculada])
+  @@map("plazos")
+}
+
+/// The docket: everything that happened, in order.
+model Actuacion {
+  id             String @id @default(cuid(2))
+  organisationId String
+  expedienteId   String
+
+  fecha       DateTime @db.Date
+  tipo        String
+  descripcion String
+  autorId     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  expediente Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, expedienteId, fecha])
+  @@map("actuaciones")
 }

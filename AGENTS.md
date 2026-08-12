@@ -6,13 +6,13 @@ build it and where we currently are.
 
 ## Current state
 
-|                           |                                                                          |
-| ------------------------- | ------------------------------------------------------------------------ |
-| **Milestone complete**    | M0 — Foundation                                                          |
-| **Milestone in progress** | — (M1, Identity & tenancy, is next)                                      |
-| **Product**               | Olbun — Spanish public-sector contractors                                |
-| **Spec**                  | `SPEC.md` (rewritten for Spain 2026-08-11; UK original at git `b1e9d5b`) |
-| **Last updated**          | 2026-08-11                                                               |
+|                           |                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Milestones complete**   | M0 Foundation · M1 Identity & tenancy · M3 Deadline engine · M4 Contracts · M5 Expedientes, plazos & timeline |
+| **Milestone in progress** | — (M6, Communications, is next)                                                                               |
+| **Product**               | Olbun — Spanish public-sector contractors                                                                     |
+| **Spec**                  | `SPEC.md` (rewritten for Spain 2026-08-11; UK original at git `b1e9d5b`)                                      |
+| **Last updated**          | 2026-08-12                                                                                                    |
 
 ## Getting started
 

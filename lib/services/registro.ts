@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { identityClientBecause } from '@/lib/db/tenant';
+import { sembrarPlantillasDelSistema } from './plantillas';
 import { hashPassword } from '@/lib/auth/password';
 import { uniqueSlug } from '@/lib/domain/slug';
 import { logger } from '@/lib/logger';
@@ -62,6 +63,11 @@ export async function registrarOrganizacion(input: SignUpInput): Promise<Registr
         acceptedAt: new Date(),
       },
     });
+
+    // In the same transaction: an organisation without its procedure
+    // templates would have to build its first expediente by hand while the
+    // clock was already running.
+    await sembrarPlantillasDelSistema(tx, organisation.id);
 
     return { user, organisation };
   });

@@ -1,5 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
+import { PLANTILLAS_SEMILLA } from '../lib/domain/expedientes/plantillas-semilla';
+
 /**
  * Demo dataset (SPEC §10).
  *
@@ -185,7 +187,59 @@ const CONTRATOS: ContratoSemilla[] = [
   },
 ];
 
+/** Seeds the procedure templates every tenant starts with. */
+async function sembrarPlantillas(prisma: PrismaClient, organisationId: string): Promise<void> {
+  for (const semilla of PLANTILLAS_SEMILLA) {
+    const plantilla = await prisma.plantillaProcedimiento.upsert({
+      where: {
+        organisationId_tipo_nombre: {
+          organisationId,
+          tipo: semilla.tipo as never,
+          nombre: semilla.nombre,
+        },
+      },
+      update: { descripcion: semilla.descripcion },
+      create: {
+        organisationId,
+        nombre: semilla.nombre,
+        tipo: semilla.tipo as never,
+        jurisdiccion: semilla.jurisdiccion as never,
+        descripcion: semilla.descripcion,
+        esDelSistema: true,
+      },
+      select: { id: true },
+    });
+
+    for (const hito of semilla.hitos) {
+      await prisma.plantillaHito.upsert({
+        where: { plantillaId_orden: { plantillaId: plantilla.id, orden: hito.orden } },
+        update: {
+          nombre: hito.nombre,
+          plazoCantidad: hito.plazoCantidad ?? null,
+          plazoComputo: (hito.plazoComputo ?? null) as never,
+          plazoFundamento: hito.plazoFundamento ?? null,
+        },
+        create: {
+          organisationId,
+          plantillaId: plantilla.id,
+          orden: hito.orden,
+          nombre: hito.nombre,
+          tipo: hito.tipo,
+          descripcion: hito.descripcion ?? null,
+          plazoCantidad: hito.plazoCantidad ?? null,
+          plazoComputo: (hito.plazoComputo ?? null) as never,
+          plazoFundamento: hito.plazoFundamento ?? null,
+          plazoEsPreclusivo: hito.plazoEsPreclusivo ?? false,
+          desplazamientoDias: hito.desplazamientoDias ?? null,
+        },
+      });
+    }
+  }
+}
+
 export async function sembrarDemo(prisma: PrismaClient, organisationId: string): Promise<void> {
+  await sembrarPlantillas(prisma, organisationId);
+
   const idsOrgano = new Map<string, string>();
 
   for (const organo of ORGANOS) {

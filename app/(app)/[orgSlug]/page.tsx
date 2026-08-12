@@ -6,10 +6,11 @@ import { getSessionContext } from '@/lib/auth/session';
 import type { Permission } from '@/lib/auth/permissions';
 
 /**
- * M1 landing page. There is no product surface yet — contracts arrive in M4 and
- * expedientes in M5 — so this page shows the thing M1 actually delivers: who
- * you are, which organisation you are acting in, and exactly what your role
- * lets you do, read live from the permission matrix.
+ * The landing page: who you are, which organisation you are acting in, and
+ * exactly what your role lets you do — read live from the permission matrix
+ * rather than from a hand-maintained list, so it cannot drift from the real
+ * answer. Modules that do not exist yet render as plain cards with the
+ * milestone they arrive in.
  */
 
 interface Area {
@@ -34,6 +35,7 @@ const AREAS: Area[] = [
     descripcion: 'Cronología procesal, hitos y plazos con su fundamento.',
     hito: 'M5',
     permiso: 'expediente:view',
+    ruta: 'expedientes',
   },
   {
     titulo: 'Comunicaciones',
@@ -158,8 +160,8 @@ export default async function OrgHomePage({
       ) : null}
 
       <p className="border-t border-border pt-6 text-xs text-muted-foreground">
-        Hito M1 — identidad y multi-tenencia. Contratos llegan en M4, expedientes y plazos en
-        M5.
+        Contratos, expedientes y plazos ya están disponibles. Comunicaciones llegan en M6 y el
+        módulo de personal en M11.
       </p>
     </div>
   );

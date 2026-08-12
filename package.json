@@ -31,6 +31,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
     "db:cuenta-demo": "tsx prisma/cuenta-demo.ts",
+    "db:expediente-demo": "tsx prisma/expediente-demo.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "prepare": "husky"
   },

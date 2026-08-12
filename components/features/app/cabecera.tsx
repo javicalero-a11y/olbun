@@ -11,13 +11,20 @@ interface CabeceraProps {
   rol: Role;
 }
 
+/** Modules that exist. Permission-gated pages 403 on their own if entered. */
+const SECCIONES = [
+  { titulo: 'Contratos', ruta: 'contratos' },
+  { titulo: 'Expedientes', ruta: 'expedientes' },
+  { titulo: 'Plazos', ruta: 'plazos' },
+];
+
 export function CabeceraApp({ organisation, organisations, user, rol }: CabeceraProps) {
   const otras = organisations.filter((o) => o.slug !== organisation.slug);
 
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Link
             href={`/${organisation.slug}`}
             className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
@@ -28,6 +35,23 @@ export function CabeceraApp({ organisation, organisations, user, rol }: Cabecera
             /
           </span>
           <span className="text-sm font-medium">{organisation.name}</span>
+
+          {/* Wraps rather than hiding on narrow screens: a phone with no way to
+              reach Plazos is a phone that cannot tell you what expires today. */}
+          <nav
+            aria-label="Secciones"
+            className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 sm:ml-4 sm:w-auto"
+          >
+            {SECCIONES.map((seccion) => (
+              <Link
+                key={seccion.ruta}
+                href={`/${organisation.slug}/${seccion.ruta}`}
+                className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {seccion.titulo}
+              </Link>
+            ))}
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">

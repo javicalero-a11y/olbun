@@ -40,6 +40,12 @@ const TENANT_OWNED = new Set<string>([
   'ContactoPoderAdjudicador',
   'Contrato',
   'Modificado',
+  'PlantillaProcedimiento',
+  'PlantillaHito',
+  'Expediente',
+  'Hito',
+  'Plazo',
+  'Actuacion',
 ]);
 
 /** Exported so a test can assert it covers every model carrying organisationId. */
