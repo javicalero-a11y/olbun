@@ -4,6 +4,7 @@ import { identityClientBecause } from '@/lib/db/tenant';
 import { verifyPassword } from '@/lib/auth/password';
 import { consumirCodigoRecuperacion, verificarCodigoMfa } from '@/lib/auth/mfa';
 import { logger } from '@/lib/logger';
+import type { UsuarioExistente } from '@/lib/auth/politica-acceso';
 
 /**
  * Credential verification, shared by the sign-in server action and by Auth.js's
@@ -104,4 +105,38 @@ export async function verificarCredenciales(
   });
 
   return { estado: 'OK', userId: usuario.id, email: usuario.email, nombre: usuario.name };
+}
+
+/**
+ * The facts the non-password sign-in policy needs about an address.
+ *
+ * Returns null when nobody holds it, which the policy reads as "a new account
+ * is about to be created". Deliberately reports nothing about *why* an account
+ * is unavailable: the caller turns every refusal into the same sentence, so
+ * this cannot be used to find out which addresses are registered.
+ */
+export async function estadoParaPolitica(
+  email: string,
+  provider: string,
+): Promise<UsuarioExistente | null> {
+  const db = identityClientBecause(
+    'a social sign-in resolves a user before any organisation is known',
+  );
+
+  const usuario = await db.user.findFirst({
+    where: { email: email.toLowerCase(), deletedAt: null },
+    select: {
+      mfaEnabled: true,
+      lockedUntil: true,
+      accounts: { where: { provider }, select: { id: true } },
+    },
+  });
+
+  if (!usuario) return null;
+
+  return {
+    mfaEnabled: usuario.mfaEnabled,
+    yaVinculado: usuario.accounts.length > 0,
+    bloqueada: usuario.lockedUntil !== null && usuario.lockedUntil > new Date(),
+  };
 }

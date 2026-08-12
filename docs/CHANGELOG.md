@@ -4,6 +4,21 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## Entrar con Google y con enlace por correo (2026-08-12)
+
+- Adaptador de Auth.js ajustado al modelo `User` que ya existía: traduce
+  `emailVerified`/`image` y da un nombre provisional a quien entra por enlace
+  mágico, porque `name` no admite nulos.
+- Política de acceso: sólo se vincula una cuenta de Google si el proveedor
+  confirma el correo, y ninguna cuenta con doble factor puede entrar por una vía
+  que no sepa pedirle el código.
+- Google se registra sólo si hay credenciales; sin ellas la aplicación arranca
+  igual y no enseña el botón.
+- Enlace mágico a través de `lib/mail`, así que en desarrollo se escribe en la
+  consola y no hace falta ningún SMTP.
+- `/bienvenida`: acepta invitaciones pendientes o crea la organización, que es
+  lo que evita que quien entra con Google se quede autenticado y sin sitio.
+
 ## M5 — Expedientes, plazos y cronograma (2026-08-12)
 
 - Modelo de expedientes: plantillas de procedimiento, hitos, plazos y actuaciones,

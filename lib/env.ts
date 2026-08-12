@@ -32,7 +32,27 @@ const serverSchema = z.object({
   APP_URL: z.url().default('http://localhost:3000'),
 
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+
+  /**
+   * Google sign-in. Optional on purpose: a developer without a Google Cloud
+   * project still gets a working app, just without that button. Both halves
+   * are required together — half a credential silently produces a provider
+   * that fails only when somebody clicks it.
+   */
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /** From: address for magic links. Falls back to a no-reply on APP_URL's host. */
+  AUTH_EMAIL_FROM: z.email().optional(),
 });
+
+const serverSchemaValidado = serverSchema.refine(
+  (env) => Boolean(env.GOOGLE_CLIENT_ID) === Boolean(env.GOOGLE_CLIENT_SECRET),
+  {
+    message: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together, or neither',
+    path: ['GOOGLE_CLIENT_ID'],
+  },
+);
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
@@ -48,7 +68,7 @@ function formatIssues(error: z.ZodError): string {
  * singleton so tests can exercise it against arbitrary inputs.
  */
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {
-  const parsed = serverSchema.safeParse(source);
+  const parsed = serverSchemaValidado.safeParse(source);
 
   if (!parsed.success) {
     throw new Error(

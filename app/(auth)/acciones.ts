@@ -195,3 +195,35 @@ export async function aceptar(
 
   redirect(`/acceso?invitacion=aceptada`);
 }
+
+/**
+ * Starts a sign-in that is not the password form.
+ *
+ * Both end at `/bienvenida` rather than at an organisation URL, because
+ * neither knows which organisation the person belongs to — or whether they
+ * belong to one at all. That page decides.
+ */
+export async function entrarConGoogle(): Promise<void> {
+  await signIn('google', { redirectTo: '/bienvenida' });
+}
+
+export async function pedirEnlaceDeAcceso(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  // Its own field name, because the password form on the same page already
+  // uses `email` and two inputs cannot share an id.
+  const email = formData.get('email-enlace');
+
+  const parsed = z.email().safeParse(typeof email === 'string' ? email.trim() : '');
+  if (!parsed.success) {
+    return { errores: { 'email-enlace': ['Escribe una dirección de correo válida.'] } };
+  }
+
+  await signIn('nodemailer', {
+    email: parsed.data,
+    redirectTo: '/bienvenida',
+  });
+
+  return {};
+}

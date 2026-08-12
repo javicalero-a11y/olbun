@@ -58,3 +58,30 @@ export function correoInvitacion(datos: {
     ].join('\n'),
   };
 }
+
+export function correoEnlaceAcceso(datos: {
+  para: string;
+  url: string;
+  minutosCaducidad: number;
+}): Mensaje {
+  const titulo = 'Tu enlace para entrar en Olbun';
+
+  return {
+    para: datos.para,
+    asunto: titulo,
+    html: envoltorio(
+      titulo,
+      `<p>Pulsa el botón para entrar. El enlace caduca en ${String(datos.minutosCaducidad)} minutos y sólo sirve una vez.</p>
+       <p>Si no has pedido tú este enlace, ignora este correo: sin pulsarlo no ocurre nada.</p>`,
+      { texto: 'Entrar en Olbun', url: datos.url },
+    ),
+    texto: [
+      titulo,
+      '',
+      `El enlace caduca en ${String(datos.minutosCaducidad)} minutos y sólo sirve una vez.`,
+      'Si no has pedido tú este enlace, ignora este correo: sin pulsarlo no ocurre nada.',
+      '',
+      `Entrar: ${datos.url}`,
+    ].join('\n'),
+  };
+}

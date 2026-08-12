@@ -2,6 +2,10 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { authConfig } from './auth.config';
+import { olbunAdapter } from '@/lib/auth/adaptador';
+import { proveedoresAdicionales } from '@/lib/auth/proveedores';
+import { estadoParaPolitica } from '@/lib/services/acceso';
+import { decidirAcceso, type ProveedorAcceso } from '@/lib/auth/politica-acceso';
 import { verificarCredenciales } from '@/lib/services/acceso';
 import { signInSchema } from '@/lib/validation/auth';
 
@@ -13,6 +17,10 @@ import { signInSchema } from '@/lib/validation/auth';
  * every request (see lib/auth/session.ts), so a stale token can never widen
  * access.
  *
+ * The adapter is still needed under the JWT strategy: Google and magic-link
+ * sign-ins have to persist a user and an account row even though the session
+ * itself never touches the database. The `sessions` table stays unused.
+ *
  * All credential logic lives in lib/services/acceso.ts, shared with the sign-in
  * server action so the lockout counter and the MFA rules cannot drift between
  * the two paths.
@@ -23,7 +31,9 @@ const ABSOLUTE_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  adapter: olbunAdapter(),
   providers: [
+    ...proveedoresAdicionales(),
     Credentials({
       credentials: {
         email: { label: 'Correo electrónico', type: 'email' },
@@ -51,6 +61,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+
+    /**
+     * The gate for every route that is not the password form.
+     *
+     * Credentials already did its own checking in `authorize`, so it passes
+     * straight through. Google and magic links go through the policy in
+     * lib/auth/politica-acceso, which decides whether this address may be
+     * linked and refuses to let an account with MFA skip its second factor.
+     *
+     * Returning a string sends the person to the sign-in page with a code the
+     * page turns into a sentence; returning false would give them Auth.js's
+     * generic error instead.
+     */
+    async signIn({ user, account, profile }) {
+      if (!account || account.provider === 'credentials') return true;
+
+      const proveedor: ProveedorAcceso = account.type === 'email' ? 'email' : 'oauth';
+      const email = user.email ?? (typeof profile?.email === 'string' ? profile.email : null);
+      if (!email) return '/acceso?motivo=CORREO_NO_VERIFICADO';
+
+      const estado = await estadoParaPolitica(email, account.provider);
+
+      const decision = decidirAcceso({
+        proveedor,
+        // Google sends `email_verified`; anything else is treated as absent,
+        // which the policy reads as "not verified".
+        correoVerificadoPorProveedor:
+          typeof profile?.['email_verified'] === 'boolean'
+            ? profile['email_verified']
+            : undefined,
+        existente: estado,
+      });
+
+      return decision.permitido ? true : `/acceso?motivo=${decision.motivo}`;
+    },
 
     jwt({ token, user }) {
       if (user?.id) {

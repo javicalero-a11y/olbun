@@ -16,6 +16,8 @@ export const authConfig = {
   pages: {
     signIn: '/acceso',
     error: '/acceso',
+    // Auth.js's own "check your email" screen is unstyled and in English.
+    verifyRequest: '/revisa-tu-correo',
   },
   session: {
     strategy: 'jwt',
@@ -38,6 +40,9 @@ export const authConfig = {
         // URL is the credential, and it is validated by the page itself.
         pathname.startsWith('/invitacion/') ||
         pathname.startsWith('/api/auth') ||
+        // Reached while signed out, by definition: it is the page telling you
+        // to go and click the link that will sign you in.
+        pathname.startsWith('/revisa-tu-correo') ||
         pathname.startsWith('/api/health');
 
       if (isPublic) return true;
