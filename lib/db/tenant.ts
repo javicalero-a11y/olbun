@@ -46,6 +46,7 @@ const TENANT_OWNED = new Set<string>([
   'Hito',
   'Plazo',
   'Actuacion',
+  'AuditEvent',
 ]);
 
 /** Exported so a test can assert it covers every model carrying organisationId. */
@@ -128,6 +129,17 @@ function scopeArgs(
 }
 
 export type TenantClient = ReturnType<typeof tenantClient>;
+
+/**
+ * The client handed to a `$transaction` callback on a tenant-scoped client.
+ *
+ * Derived rather than written out: the extension changes the client's type, so
+ * `Prisma.TransactionClient` does not match it and any hand-written stand-in
+ * drifts the moment a model is added.
+ */
+export type TenantTransactionClient = Parameters<
+  Parameters<TenantClient['$transaction']>[0]
+>[0];
 
 /**
  * Returns a Prisma client bound to one organisation. Build it once per request

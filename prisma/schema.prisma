@@ -114,6 +114,7 @@ model Organisation {
   contratos            Contrato[]
   plantillas           PlantillaProcedimiento[]
   expedientes          Expediente[]
+  auditEvents          AuditEvent[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -936,4 +937,65 @@ model Actuacion {
 
   @@index([organisationId, expedienteId, fecha])
   @@map("actuaciones")
+}
+
+/// What kind of thing happened. Coarse on purpose: the detail lives in
+/// `accion`, and a small enum keeps the index selective and the dashboards
+/// legible.
+enum TipoEventoAuditoria {
+  CREACION
+  MODIFICACION
+  BORRADO
+  ACCESO
+  EXPORTACION
+  ACCESO_DENEGADO
+  AUTENTICACION
+}
+
+/// The audit trail (SPEC §7.3).
+///
+/// Append-only, enforced by a database trigger rather than by convention: an
+/// audit log an application can rewrite is not evidence. Rows survive the
+/// deletion of what they describe, so `entidadId` is a plain string and not a
+/// foreign key — the point of the record is to outlive the thing.
+///
+/// Immutable, so it omits updatedAt/deletedAt per ADR 0003.
+model AuditEvent {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  /// Null for events that happen before anyone is resolved, like a failed
+  /// sign-in against an address that does not exist.
+  actorId       String?
+  actorEmail    String?
+  actorRol      Role?
+  /// True when the actor was acting through a time-boxed AccessGrant.
+  porDelegacion Boolean @default(false)
+
+  tipo        TipoEventoAuditoria
+  /// Dotted and stable, e.g. `contrato.crear`, `plazo.confirmar`.
+  accion      String
+  /// The Prisma model name, e.g. `Contrato`.
+  entidad     String
+  entidadId   String?
+  /// Human-readable at the time of writing, so a deleted record still reads.
+  descripcion String?
+
+  /// Only the fields that changed, redacted of secrets by the writer.
+  antes   Json?
+  despues Json?
+
+  ip        String?
+  userAgent String?
+  /// Correlates every event produced by one request.
+  requestId String?
+
+  createdAt DateTime @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, createdAt])
+  @@index([organisationId, entidad, entidadId])
+  @@index([organisationId, actorId, createdAt])
+  @@map("audit_events")
 }

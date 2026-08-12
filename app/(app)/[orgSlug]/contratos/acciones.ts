@@ -5,16 +5,13 @@ import { redirect } from 'next/navigation';
 
 import { requirePermission } from '@/lib/auth/guardias';
 import { tenantClient } from '@/lib/db/tenant';
+import { crearAccion, ErrorDeCampo } from '@/lib/actions/crear-accion';
+import { aEstado, casilla, texto } from '@/lib/actions/formulario';
 import { contratoSchema, poderAdjudicadorSchema } from '@/lib/validation/contratos';
 
 export interface EstadoContratos {
   error?: string;
   errores?: Record<string, string[]>;
-}
-
-function texto(formData: FormData, campo: string): string | undefined {
-  const valor = formData.get(campo);
-  return typeof valor === 'string' ? valor : undefined;
 }
 
 export async function crearPoderAdjudicador(
@@ -66,14 +63,84 @@ export async function crearPoderAdjudicador(
   return {};
 }
 
+/**
+ * Creating a contract, through the standard action pipeline: the permission
+ * check, the transaction and the audit event are the wrapper's job, not this
+ * function's. What is left here is the part that is actually about contracts.
+ */
+const accionCrearContrato = crearAccion({
+  nombre: 'contrato.crear',
+  permiso: 'contrato:create',
+  esquema: contratoSchema,
+  revalidar: ['/:orgSlug/contratos'],
+  async ejecutar(datos, { db, sesion, auditar }) {
+    // Looked up through the scoped client, so a contract cannot be attached to
+    // another tenant's authority by guessing an id.
+    const poder = await db.poderAdjudicador.findFirst({
+      where: { id: datos.poderAdjudicadorId, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!poder) throw new ErrorDeCampo('poderAdjudicadorId', 'Ese órgano no existe');
+
+    const yaExiste = await db.contrato.findFirst({
+      where: { numeroExpediente: datos.numeroExpediente, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (yaExiste) {
+      throw new ErrorDeCampo(
+        'numeroExpediente',
+        'Ya tienes un contrato con ese número de expediente',
+      );
+    }
+
+    const fecha = (valor?: string) => (valor ? new Date(`${valor}T00:00:00.000Z`) : null);
+
+    const contrato = await db.contrato.create({
+      data: {
+        organisationId: sesion.organisation.id,
+        numeroExpediente: datos.numeroExpediente,
+        objeto: datos.objeto,
+        descripcion: datos.descripcion || null,
+        poderAdjudicadorId: poder.id,
+        tipo: datos.tipo,
+        procedimiento: datos.procedimiento,
+        estado: datos.estado,
+        lote: datos.lote || null,
+        fechaFormalizacion: fecha(datos.fechaFormalizacion),
+        fechaInicio: fecha(datos.fechaInicio),
+        duracionInicialMeses: datos.duracionInicialMeses ?? null,
+        fechaFinPrevista: fecha(datos.fechaFinPrevista),
+        preavisoProrrogaDias: datos.preavisoProrrogaDias ?? null,
+        importeAdjudicacion: datos.importeAdjudicacion ?? null,
+        plazoGarantiaMeses: datos.plazoGarantiaMeses ?? null,
+        haySubrogacionPersonal: datos.haySubrogacionPersonal ?? false,
+        hayRevisionPrecios: datos.hayRevisionPrecios ?? false,
+        createdById: sesion.user.id,
+      },
+      select: { id: true, numeroExpediente: true, objeto: true },
+    });
+
+    auditar({
+      tipo: 'CREACION',
+      accion: 'contrato.crear',
+      entidad: 'Contrato',
+      entidadId: contrato.id,
+      descripcion: `${contrato.numeroExpediente} — ${contrato.objeto}`,
+      despues: { numeroExpediente: contrato.numeroExpediente, objeto: contrato.objeto },
+    });
+
+    return contrato;
+  },
+});
+
 export async function crearContrato(
   orgSlug: string,
   _previo: EstadoContratos,
   formData: FormData,
 ): Promise<EstadoContratos> {
-  const contexto = await requirePermission(orgSlug, 'contrato:create');
-
-  const parsed = contratoSchema.safeParse({
+  const resultado = await accionCrearContrato(orgSlug, {
     numeroExpediente: texto(formData, 'numeroExpediente'),
     objeto: texto(formData, 'objeto'),
     descripcion: texto(formData, 'descripcion'),
@@ -89,61 +156,11 @@ export async function crearContrato(
     preavisoProrrogaDias: texto(formData, 'preavisoProrrogaDias'),
     importeAdjudicacion: texto(formData, 'importeAdjudicacion'),
     plazoGarantiaMeses: texto(formData, 'plazoGarantiaMeses'),
-    haySubrogacionPersonal: formData.get('haySubrogacionPersonal') === 'on',
-    hayRevisionPrecios: formData.get('hayRevisionPrecios') === 'on',
+    haySubrogacionPersonal: casilla(formData, 'haySubrogacionPersonal'),
+    hayRevisionPrecios: casilla(formData, 'hayRevisionPrecios'),
   });
 
-  if (!parsed.success) return { errores: parsed.error.flatten().fieldErrors };
+  if (!resultado.ok) return aEstado(resultado);
 
-  const db = tenantClient(contexto.organisation.id);
-
-  // The authority is looked up through the scoped client, so a contract cannot
-  // be attached to another tenant's authority by id-guessing.
-  const poder = await db.poderAdjudicador.findFirst({
-    where: { id: parsed.data.poderAdjudicadorId, deletedAt: null },
-    select: { id: true },
-  });
-
-  if (!poder) return { errores: { poderAdjudicadorId: ['Ese órgano no existe'] } };
-
-  const yaExiste = await db.contrato.findFirst({
-    where: { numeroExpediente: parsed.data.numeroExpediente, deletedAt: null },
-    select: { id: true },
-  });
-
-  if (yaExiste) {
-    return {
-      errores: { numeroExpediente: ['Ya tienes un contrato con ese número de expediente'] },
-    };
-  }
-
-  const fecha = (valor?: string) => (valor ? new Date(`${valor}T00:00:00.000Z`) : null);
-
-  await db.contrato.create({
-    data: {
-      // See the note above: the scoped client overwrites this field.
-      organisationId: contexto.organisation.id,
-      numeroExpediente: parsed.data.numeroExpediente,
-      objeto: parsed.data.objeto,
-      descripcion: parsed.data.descripcion || null,
-      poderAdjudicadorId: poder.id,
-      tipo: parsed.data.tipo,
-      procedimiento: parsed.data.procedimiento,
-      estado: parsed.data.estado,
-      lote: parsed.data.lote || null,
-      fechaFormalizacion: fecha(parsed.data.fechaFormalizacion),
-      fechaInicio: fecha(parsed.data.fechaInicio),
-      duracionInicialMeses: parsed.data.duracionInicialMeses ?? null,
-      fechaFinPrevista: fecha(parsed.data.fechaFinPrevista),
-      preavisoProrrogaDias: parsed.data.preavisoProrrogaDias ?? null,
-      importeAdjudicacion: parsed.data.importeAdjudicacion ?? null,
-      plazoGarantiaMeses: parsed.data.plazoGarantiaMeses ?? null,
-      haySubrogacionPersonal: parsed.data.haySubrogacionPersonal ?? false,
-      hayRevisionPrecios: parsed.data.hayRevisionPrecios ?? false,
-      createdById: contexto.user.id,
-    },
-  });
-
-  revalidatePath(`/${orgSlug}/contratos`);
   redirect(`/${orgSlug}/contratos`);
 }
