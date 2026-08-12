@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { can } from '@/lib/auth/can';
@@ -16,6 +17,8 @@ interface Area {
   descripcion: string;
   hito: string;
   permiso: Permission;
+  /** Set once the module exists; unset areas render as plain cards. */
+  ruta?: string;
 }
 
 const AREAS: Area[] = [
@@ -24,6 +27,7 @@ const AREAS: Area[] = [
     descripcion: 'Contratos públicos, modificados, prórrogas y penalidades.',
     hito: 'M4',
     permiso: 'contrato:view',
+    ruta: 'contratos',
   },
   {
     titulo: 'Expedientes y plazos',
@@ -72,6 +76,7 @@ const AREAS: Area[] = [
     descripcion: 'Quién tiene acceso, con qué rol, y a quién invitar.',
     hito: 'M1',
     permiso: 'user:list',
+    ruta: 'ajustes/usuarios',
   },
 ];
 
@@ -115,7 +120,18 @@ export default async function OrgHomePage({
           {permitidas.map((area) => (
             <li key={area.titulo} className="rounded-lg border border-border p-4">
               <div className="flex items-baseline justify-between gap-2">
-                <h3 className="text-sm font-medium">{area.titulo}</h3>
+                <h3 className="text-sm font-medium">
+                  {area.ruta ? (
+                    <Link
+                      href={`/${orgSlug}/${area.ruta}`}
+                      className="underline-offset-4 hover:underline"
+                    >
+                      {area.titulo}
+                    </Link>
+                  ) : (
+                    area.titulo
+                  )}
+                </h3>
                 <span className="shrink-0 text-xs text-muted-foreground" data-numeric>
                   {area.hito}
                 </span>

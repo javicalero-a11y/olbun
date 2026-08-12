@@ -20,7 +20,7 @@ import type { Actor } from './can';
 
 export interface SessionContext {
   actor: Actor;
-  organisation: { id: string; slug: string; name: string };
+  organisation: { id: string; slug: string; name: string; timezone: string };
   user: { id: string; name: string; email: string };
   /** Every organisation this person may switch to. */
   organisations: { slug: string; name: string; role: Actor['role'] }[];
@@ -47,7 +47,7 @@ export const getSessionContext = cache(
       select: {
         role: true,
         status: true,
-        organisation: { select: { id: true, slug: true, name: true } },
+        organisation: { select: { id: true, slug: true, name: true, timezone: true } },
         user: { select: { id: true, name: true, email: true } },
       },
     });
