@@ -1,6 +1,8 @@
 /* eslint-disable no-console -- the seed script is a CLI, not application code. */
 import { PrismaClient } from '@prisma/client';
 
+import { CALENDARIOS_SEMILLA } from './calendarios';
+
 /**
  * Semilla del tenant de demostración.
  *
@@ -37,6 +39,52 @@ async function main(): Promise<void> {
   });
 
   console.log(`Organización sembrada: ${organisation.name} (/${organisation.slug})`);
+
+  // Holiday calendars are shared reference data, not tenant data, so they are
+  // seeded once for everyone. Deliberately left unverified: until a person
+  // checks a year against the BOE, the deadline engine reports every result
+  // computed from it as incomplete.
+  for (const semilla of CALENDARIOS_SEMILLA) {
+    const calendario = await prisma.calendario.upsert({
+      where: {
+        anio_ambito_codigo: {
+          anio: semilla.anio,
+          ambito: semilla.ambito,
+          codigo: semilla.codigo,
+        },
+      },
+      update: { nombre: semilla.nombre, fuente: semilla.fuente },
+      create: {
+        anio: semilla.anio,
+        ambito: semilla.ambito,
+        codigo: semilla.codigo,
+        nombre: semilla.nombre,
+        fuente: semilla.fuente,
+      },
+    });
+
+    for (const festivo of semilla.festivos) {
+      await prisma.festivo.upsert({
+        where: {
+          calendarioId_fecha: {
+            calendarioId: calendario.id,
+            fecha: new Date(`${festivo.fecha}T00:00:00.000Z`),
+          },
+        },
+        update: { nombre: festivo.nombre },
+        create: {
+          calendarioId: calendario.id,
+          fecha: new Date(`${festivo.fecha}T00:00:00.000Z`),
+          nombre: festivo.nombre,
+        },
+      });
+    }
+  }
+
+  const totalFestivos = await prisma.festivo.count();
+  console.log(
+    `Calendarios sembrados: ${String(CALENDARIOS_SEMILLA.length)} (${String(totalFestivos)} festivos), todos SIN verificar`,
+  );
 }
 
 main()

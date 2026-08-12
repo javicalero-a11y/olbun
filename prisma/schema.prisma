@@ -322,3 +322,56 @@ model VerificationToken {
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
+
+/// Scope of a holiday calendar. A day is inhábil if any applicable layer says
+/// so — national, autonomous or municipal.
+enum AmbitoCalendario {
+  NACIONAL
+  AUTONOMICO
+  LOCAL
+}
+
+/// Holiday calendars are public reference data, not tenant data: the calendar
+/// for Sevilla is the same for every customer operating there, so it is stored
+/// once and shared. No organisationId, and no row-level security.
+model Calendario {
+  id     String           @id @default(cuid(2))
+  anio   Int
+  ambito AmbitoCalendario
+  /// Empty for NACIONAL, the CCAA code for AUTONOMICO, the INE municipality
+  /// code for LOCAL.
+  codigo String           @default("")
+  nombre String
+
+  /// Where the data came from — a BOE or boletín autonómico reference.
+  fuente String?
+
+  /// Until a person checks the calendar against its official source, every
+  /// deadline computed from it is reported as incomplete (SPEC §6.1).
+  verificadoEn    DateTime?
+  verificadoPorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  festivos Festivo[]
+
+  @@unique([anio, ambito, codigo])
+  @@index([ambito, codigo])
+  @@map("calendarios")
+}
+
+model Festivo {
+  id           String   @id @default(cuid(2))
+  calendarioId String
+  /// Stored as a date, never a timestamp: a holiday is a calendar day, and a
+  /// timestamp would drag a timezone into a computation that must not have one.
+  fecha        DateTime @db.Date
+  nombre       String
+
+  calendario Calendario @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarioId, fecha])
+  @@index([fecha])
+  @@map("festivos")
+}
