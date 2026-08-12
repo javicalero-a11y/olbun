@@ -42,6 +42,16 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 
+  /**
+   * Microsoft Entra ID (work and school accounts). Optional on the same terms
+   * as Google. `MICROSOFT_TENANT_ID` narrows sign-in to one directory; left
+   * unset, any Entra directory may sign in — which is what a product sold to
+   * many different companies actually wants.
+   */
+  MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_TENANT_ID: z.string().min(1).optional(),
+
   /** From: address for magic links. Falls back to a no-reply on APP_URL's host. */
   AUTH_EMAIL_FROM: z.email().optional(),
 });

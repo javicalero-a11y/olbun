@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Google from 'next-auth/providers/google';
+import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
 import Nodemailer from 'next-auth/providers/nodemailer';
 import type { Provider } from 'next-auth/providers';
 
@@ -37,6 +38,23 @@ export function proveedoresAdicionales(): Provider[] {
         // Never link by matching addresses alone. Whether an account may be
         // linked is decided in lib/auth/politica-acceso, which insists the
         // provider states it verified the address.
+        allowDangerousEmailAccountLinking: false,
+      }),
+    );
+  }
+
+  if (env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET) {
+    proveedores.push(
+      MicrosoftEntraID({
+        clientId: env.MICROSOFT_CLIENT_ID,
+        clientSecret: env.MICROSOFT_CLIENT_SECRET,
+        // Without a tenant the provider defaults to `common`, which lets any
+        // Entra directory sign in. That is what a product sold to many
+        // different companies wants; set MICROSOFT_TENANT_ID to lock it to one.
+        ...(env.MICROSOFT_TENANT_ID ? { issuer: env.MICROSOFT_TENANT_ID } : {}),
+        // Same rule as Google: linking is decided by the policy, which for
+        // Entra reads the directory the token came from (see
+        // lib/auth/politica-acceso.correoVerificadoPor).
         allowDangerousEmailAccountLinking: false,
       }),
     );
@@ -83,5 +101,16 @@ export type EstadoGoogle = 'activo' | 'sin-configurar' | 'oculto';
  */
 export function estadoGoogle(): EstadoGoogle {
   if (googleDisponible()) return 'activo';
+  return serverEnv().NODE_ENV === 'development' ? 'sin-configurar' : 'oculto';
+}
+
+/** True when the Microsoft button should be rendered. */
+export function microsoftDisponible(): boolean {
+  const env = serverEnv();
+  return Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET);
+}
+
+export function estadoMicrosoft(): EstadoGoogle {
+  if (microsoftDisponible()) return 'activo';
   return serverEnv().NODE_ENV === 'development' ? 'sin-configurar' : 'oculto';
 }

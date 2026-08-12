@@ -5,7 +5,11 @@ import { authConfig } from './auth.config';
 import { olbunAdapter } from '@/lib/auth/adaptador';
 import { proveedoresAdicionales } from '@/lib/auth/proveedores';
 import { estadoParaPolitica } from '@/lib/services/acceso';
-import { decidirAcceso, type ProveedorAcceso } from '@/lib/auth/politica-acceso';
+import {
+  correoVerificadoPor,
+  decidirAcceso,
+  type ProveedorAcceso,
+} from '@/lib/auth/politica-acceso';
 import { verificarCredenciales } from '@/lib/services/acceso';
 import { signInSchema } from '@/lib/validation/auth';
 
@@ -85,12 +89,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       const decision = decidirAcceso({
         proveedor,
-        // Google sends `email_verified`; anything else is treated as absent,
-        // which the policy reads as "not verified".
-        correoVerificadoPorProveedor:
-          typeof profile?.['email_verified'] === 'boolean'
-            ? profile['email_verified']
-            : undefined,
+        // Each provider states this differently — Google with `email_verified`,
+        // Entra not at all — so the reading lives in one tested function rather
+        // than inline here.
+        correoVerificadoPorProveedor: correoVerificadoPor(account.provider, profile),
         existente: estado,
       });
 

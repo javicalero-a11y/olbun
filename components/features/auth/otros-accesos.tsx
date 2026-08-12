@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 
 import {
   entrarConGoogle,
+  entrarConMicrosoft,
   pedirEnlaceDeAcceso,
   type EstadoFormulario,
 } from '@/app/(auth)/acciones';
@@ -22,7 +23,56 @@ const BOTON_EXTERNO =
  * button. In development it is shown disabled instead, so this page can be
  * reviewed as it will really look without a Google Cloud project existing.
  */
-export function OtrosAccesos({ google }: { google: 'activo' | 'sin-configurar' | 'oculto' }) {
+export type EstadoProveedor = 'activo' | 'sin-configurar' | 'oculto';
+
+/** One button, in whichever of the three states its credentials put it. */
+function BotonProveedor({
+  estado,
+  accion,
+  etiqueta,
+  icono,
+  variables,
+}: {
+  estado: EstadoProveedor;
+  accion: () => Promise<void>;
+  etiqueta: string;
+  icono: React.ReactNode;
+  variables: React.ReactNode;
+}) {
+  if (estado === 'oculto') return null;
+
+  if (estado === 'activo') {
+    return (
+      <form action={accion}>
+        <button type="submit" className={`${BOTON_EXTERNO} hover:bg-accent`}>
+          {icono}
+          {etiqueta}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <button type="button" disabled className={`${BOTON_EXTERNO} opacity-50`}>
+        {icono}
+        {etiqueta}
+      </button>
+      <p className="text-xs text-muted-foreground">
+        Sólo en desarrollo: define {variables} para activarlo. En producción este botón no
+        aparece hasta que estén configurados.
+      </p>
+    </div>
+  );
+}
+
+export function OtrosAccesos({
+  google,
+  microsoft,
+}: {
+  google: EstadoProveedor;
+  microsoft: EstadoProveedor;
+}) {
   const [estado, enviar, pendiente] = useActionState(pedirEnlaceDeAcceso, INICIAL);
 
   return (
@@ -33,28 +83,29 @@ export function OtrosAccesos({ google }: { google: 'activo' | 'sin-configurar' |
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
 
-      {google === 'activo' ? (
-        <form action={entrarConGoogle}>
-          <button type="submit" className={`${BOTON_EXTERNO} hover:bg-accent`}>
-            <GoogleIcono />
-            Entrar con Google
-          </button>
-        </form>
-      ) : null}
+      <BotonProveedor
+        estado={google}
+        accion={entrarConGoogle}
+        etiqueta="Entrar con Google"
+        icono={<GoogleIcono />}
+        variables={
+          <>
+            <code>GOOGLE_CLIENT_ID</code> y <code>GOOGLE_CLIENT_SECRET</code>
+          </>
+        }
+      />
 
-      {google === 'sin-configurar' ? (
-        <div className="space-y-1.5">
-          <button type="button" disabled className={`${BOTON_EXTERNO} opacity-50`}>
-            <GoogleIcono />
-            Entrar con Google
-          </button>
-          <p className="text-xs text-muted-foreground">
-            Sólo en desarrollo: define <code>GOOGLE_CLIENT_ID</code> y{' '}
-            <code>GOOGLE_CLIENT_SECRET</code> para activarlo. En producción este botón no
-            aparece hasta que estén configurados.
-          </p>
-        </div>
-      ) : null}
+      <BotonProveedor
+        estado={microsoft}
+        accion={entrarConMicrosoft}
+        etiqueta="Entrar con Microsoft"
+        icono={<MicrosoftIcono />}
+        variables={
+          <>
+            <code>MICROSOFT_CLIENT_ID</code> y <code>MICROSOFT_CLIENT_SECRET</code>
+          </>
+        }
+      />
 
       <form action={enviar} className="space-y-3" noValidate>
         <ErrorGeneral mensaje={estado.error} />
@@ -81,6 +132,17 @@ export function OtrosAccesos({ google }: { google: 'activo' | 'sin-configurar' |
         </button>
       </form>
     </div>
+  );
+}
+
+function MicrosoftIcono() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path fill="#F25022" d="M0 0h7.5v7.5H0z" />
+      <path fill="#7FBA00" d="M8.5 0H16v7.5H8.5z" />
+      <path fill="#00A4EF" d="M0 8.5h7.5V16H0z" />
+      <path fill="#FFB900" d="M8.5 8.5H16V16H8.5z" />
+    </svg>
   );
 }
 

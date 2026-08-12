@@ -207,6 +207,10 @@ export async function entrarConGoogle(): Promise<void> {
   await signIn('google', { redirectTo: '/bienvenida' });
 }
 
+export async function entrarConMicrosoft(): Promise<void> {
+  await signIn('microsoft-entra-id', { redirectTo: '/bienvenida' });
+}
+
 export async function pedirEnlaceDeAcceso(
   _previo: EstadoFormulario,
   formData: FormData,

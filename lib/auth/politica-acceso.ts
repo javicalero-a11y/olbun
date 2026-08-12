@@ -21,6 +21,41 @@
 
 export type ProveedorAcceso = 'oauth' | 'email';
 
+/**
+ * The tenant every personal Microsoft account is issued from. A fixed GUID
+ * published by Microsoft, not a value that varies by deployment.
+ */
+export const TENANT_CUENTAS_PERSONALES = '9188040d-6c67-4c5b-b112-36a304b66dad';
+
+/**
+ * Whether the provider is telling us it checked the address.
+ *
+ * Google says so outright with `email_verified`. **Microsoft Entra does not
+ * emit that claim at all**, so taking its absence as "unverified" would refuse
+ * every Microsoft sign-in, and taking it as "verified" would accept personal
+ * Microsoft accounts on somebody's word.
+ *
+ * The rule instead: an Entra token counts as verified when it comes from a real
+ * organisational directory, because there the address is provisioned and
+ * controlled by that organisation's IT — stronger assurance than a
+ * self-asserted email, not weaker. A token from the personal-accounts tenant
+ * gets no such credit.
+ */
+export function correoVerificadoPor(
+  provider: string,
+  claims: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!claims) return false;
+
+  if (provider === 'microsoft-entra-id') {
+    const tid = claims['tid'];
+    return typeof tid === 'string' && tid.length > 0 && tid !== TENANT_CUENTAS_PERSONALES;
+  }
+
+  // Google and anything else OIDC-shaped: only an explicit true counts.
+  return claims['email_verified'] === true;
+}
+
 export type MotivoRechazo =
   /** The provider would not confirm it had verified the address. */
   | 'CORREO_NO_VERIFICADO'

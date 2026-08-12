@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { decidirAcceso, type UsuarioExistente } from './politica-acceso';
+import {
+  correoVerificadoPor,
+  decidirAcceso,
+  TENANT_CUENTAS_PERSONALES,
+  type UsuarioExistente,
+} from './politica-acceso';
 
 function existente(sobrescribe: Partial<UsuarioExistente> = {}): UsuarioExistente {
   return { mfaEnabled: false, yaVinculado: false, bloqueada: false, ...sobrescribe };
@@ -118,5 +123,40 @@ describe('decidirAcceso — cuentas no disponibles', () => {
         existente: existente({ bloqueada: true }),
       }),
     ).toEqual({ permitido: false, motivo: 'CUENTA_NO_DISPONIBLE' });
+  });
+});
+
+describe('correoVerificadoPor', () => {
+  it('Google: sólo un email_verified explícito cuenta', () => {
+    expect(correoVerificadoPor('google', { email_verified: true })).toBe(true);
+    expect(correoVerificadoPor('google', { email_verified: false })).toBe(false);
+    expect(correoVerificadoPor('google', {})).toBe(false);
+    expect(correoVerificadoPor('google', { email_verified: 'true' })).toBe(false);
+  });
+
+  it('Entra: un directorio de organización cuenta como verificado', () => {
+    // Entra no emite email_verified. Ahí la dirección la provisiona el
+    // departamento de informática de la empresa, que es más garantía que una
+    // dirección que alguien se atribuye, no menos.
+    expect(
+      correoVerificadoPor('microsoft-entra-id', { tid: 'a1b2c3d4-0000-0000-0000-abc' }),
+    ).toBe(true);
+  });
+
+  it('Entra: una cuenta personal de Microsoft no cuenta', () => {
+    expect(correoVerificadoPor('microsoft-entra-id', { tid: TENANT_CUENTAS_PERSONALES })).toBe(
+      false,
+    );
+  });
+
+  it('Entra sin tid no cuenta: no inventamos la garantía que falta', () => {
+    expect(correoVerificadoPor('microsoft-entra-id', {})).toBe(false);
+    expect(correoVerificadoPor('microsoft-entra-id', { tid: '' })).toBe(false);
+    expect(correoVerificadoPor('microsoft-entra-id', { tid: 42 })).toBe(false);
+  });
+
+  it('sin claims no hay verificación posible', () => {
+    expect(correoVerificadoPor('google', null)).toBe(false);
+    expect(correoVerificadoPor('microsoft-entra-id', undefined)).toBe(false);
   });
 });
