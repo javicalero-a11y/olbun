@@ -2,7 +2,7 @@
 
 **Estado: PENDIENTE DE REVISIÓN POR ABOGADO.**
 **Preparado por:** el equipo de desarrollo, que no tiene formación jurídica.
-**Fecha:** 12 de agosto de 2026
+**Fecha:** 12 de agosto de 2026 (ampliado con el apartado 2.7 el mismo día)
 **Código afectado:** `lib/domain/plazos/`, `lib/domain/fecha.ts`
 
 ---
@@ -23,6 +23,10 @@ presentarlos como fechas firmes hasta que esta revisión se cierre.
 
 **Lo que pedimos:** confirmar o corregir cada regla del apartado 2, y responder
 a las preguntas del apartado 4. Nada más.
+
+Las dos cuestiones con más consecuencias son la **4.1** (desde qué día cuentan
+los plazos por meses) y la **2.7 / 4.6** (cómo se encadenan los plazos dentro de
+un mismo procedimiento). Si sólo hubiera tiempo para dos, son ésas.
 
 ---
 
@@ -97,6 +101,16 @@ calculado sobre él se devuelve marcado como incompleto.
 | **Ejemplo**          | Puesta a disposición el 2 de marzo, sin acceso → efectos el 12 de marzo.                                                                                                                         |
 | **Salvaguarda**      | El sistema **propone** esta fecha; una persona la confirma antes de que ningún plazo empiece a correr.                                                                                           |
 
+### 2.7 Encadenamiento de plazos dentro de un procedimiento
+
+|                      |                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Precepto**         | Ninguno: es una regla nuestra, no legal. Por eso la señalamos aparte.                                                                                                                                            |
+| **Regla programada** | Al abrir un expediente desde una plantilla se instancian todos sus hitos de golpe. **Cada paso cuenta desde el anterior, no desde la apertura.**                                                                 |
+| **Por qué**          | El plazo para recurrir corre desde la resolución que se recurre. Calcularlo desde la apertura mostraría una ventana de recurso cerrándose semanas antes de que exista la resolución.                             |
+| **Ejemplo**          | Notificación el 6 de agosto → alegaciones (10 días hábiles) vencen el 20 de agosto → resolución estimada 45 días después, el 4 de octubre → recurso de reposición (1 mes) vence el 4 de noviembre.               |
+| **Salvaguarda**      | En cuanto la cadena pasa por una fecha **estimada** (la resolución del ejemplo), todo lo posterior se marca como cálculo incompleto y lo dice en pantalla, por muy correcta que sea la aritmética de calendario. |
+
 ---
 
 ## 3. Lo que el sistema deliberadamente NO hace
@@ -146,7 +160,16 @@ Tenemos modelado que la papeleta de conciliación **suspende** el plazo de
 caducidad de la acción de despido (20 días hábiles, art. 59.3 ET). ¿Suspende o
 interrumpe? ¿Cuándo se reanuda exactamente?
 
-### 4.6 Traslados de festivos
+### 4.6 ¿Desde cuándo cuenta el paso siguiente?
+
+Cuando un trámite tiene plazo (por ejemplo, 10 días hábiles para alegar), el
+sistema hace arrancar el paso siguiente el día del **vencimiento** de ese plazo,
+porque es la fecha más tardía posible y la más prudente para planificar. En la
+práctica el escrito suele presentarse antes. **¿Es aceptable como estimación de
+planificación**, entendiendo que se sustituye por la fecha real en cuanto se
+registra el trámite, o induce a error?
+
+### 4.7 Traslados de festivos
 
 Cuando un festivo nacional cae en domingo y se traslada, ¿el día trasladado es
 inhábil a todos los efectos, o sólo laboralmente? Afecta a cómo cargamos los
