@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { Role } from '@prisma/client';
 
+import { crearAccion, ErrorDeCampo } from '@/lib/actions/crear-accion';
+import { registrarEvento } from '@/lib/audit/registrar';
 import { requirePermission } from '@/lib/auth/guardias';
 import { generarAltaMfa, generarCodigosRecuperacion, verificarCodigoMfa } from '@/lib/auth/mfa';
 import { identityClientBecause, tenantClient } from '@/lib/db/tenant';
@@ -80,74 +82,122 @@ export async function invitar(
   return { exito: `Invitación enviada a ${parsed.data.email}.` };
 }
 
+const accionCambiarRol = crearAccion({
+  nombre: 'membresia.cambiar_rol',
+  permiso: 'user:update_role',
+  esquema: z.object({ membershipId: z.string().min(1), role: z.enum(ROLES) }),
+  revalidar: ['/:orgSlug/ajustes/usuarios'],
+  async ejecutar({ membershipId, role }, { db, auditar }) {
+    const objetivo = await db.membership.findFirst({
+      where: { id: membershipId },
+      select: { id: true, role: true, userId: true, user: { select: { email: true } } },
+    });
+
+    if (!objetivo) throw new ErrorDeCampo('membershipId', 'No se ha encontrado esa persona.');
+
+    // OWNER is absent from the schema — ownership transfers deliberately, not
+    // through this form — so reaching an owner here always means demoting one.
+    // The last one must not be able to lock everyone out of billing and
+    // organisation deletion.
+    if (objetivo.role === 'OWNER') {
+      const propietarios = await db.membership.count({
+        where: { role: 'OWNER', status: 'ACTIVE', deletedAt: null },
+      });
+
+      if (propietarios <= 1) {
+        throw new ErrorDeCampo(
+          'membershipId',
+          'La organización debe conservar al menos un propietario.',
+        );
+      }
+    }
+
+    await db.membership.update({ where: { id: membershipId }, data: { role } });
+
+    auditar({
+      tipo: 'MODIFICACION',
+      accion: 'membresia.cambiar_rol',
+      entidad: 'Membership',
+      entidadId: membershipId,
+      descripcion: `${objetivo.user.email}: ${objetivo.role} → ${role}`,
+      antes: { role: objetivo.role },
+      despues: { role },
+    });
+
+    return { exito: true };
+  },
+});
+
 export async function cambiarRol(
   orgSlug: string,
   membershipId: string,
   role: Role,
 ): Promise<EstadoAjustes> {
-  const contexto = await requirePermission(orgSlug, 'user:update_role');
-  const db = tenantClient(contexto.organisation.id);
-
-  const objetivo = await db.membership.findFirst({
-    where: { id: membershipId },
-    select: { id: true, role: true, userId: true },
-  });
-
-  if (!objetivo) return { error: 'No se ha encontrado esa persona.' };
-
-  // The last owner must not be able to demote themselves and lock everyone out
-  // of billing and organisation deletion.
-  if (objetivo.role === 'OWNER' && role !== 'OWNER') {
-    const propietarios = await db.membership.count({
-      where: { role: 'OWNER', status: 'ACTIVE', deletedAt: null },
-    });
-
-    if (propietarios <= 1) {
-      return { error: 'La organización debe conservar al menos un propietario.' };
-    }
-  }
-
-  await db.membership.update({ where: { id: membershipId }, data: { role } });
-
-  revalidatePath(`/${orgSlug}/ajustes/usuarios`);
+  const resultado = await accionCambiarRol(orgSlug, { membershipId, role });
+  if (!resultado.ok) return { error: resultado.error };
   return { exito: 'Rol actualizado.' };
 }
+
+const accionCambiarEstado = crearAccion({
+  nombre: 'membresia.cambiar_estado',
+  permiso: 'user:suspend',
+  esquema: z.object({ membershipId: z.string().min(1), suspender: z.boolean() }),
+  revalidar: ['/:orgSlug/ajustes/usuarios'],
+  async ejecutar({ membershipId, suspender }, { db, sesion, auditar }) {
+    const objetivo = await db.membership.findFirst({
+      where: { id: membershipId },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        user: { select: { email: true } },
+      },
+    });
+
+    if (!objetivo) throw new ErrorDeCampo('membershipId', 'No se ha encontrado esa persona.');
+
+    if (objetivo.userId === sesion.user.id) {
+      throw new ErrorDeCampo('membershipId', 'No puedes suspender tu propia cuenta.');
+    }
+
+    if (suspender && objetivo.role === 'OWNER') {
+      const propietarios = await db.membership.count({
+        where: { role: 'OWNER', status: 'ACTIVE', deletedAt: null },
+      });
+
+      if (propietarios <= 1) {
+        throw new ErrorDeCampo(
+          'membershipId',
+          'La organización debe conservar al menos un propietario activo.',
+        );
+      }
+    }
+
+    const status = suspender ? 'SUSPENDED' : 'ACTIVE';
+    await db.membership.update({ where: { id: membershipId }, data: { status } });
+
+    auditar({
+      tipo: 'MODIFICACION',
+      accion: suspender ? 'membresia.suspender' : 'membresia.restablecer',
+      entidad: 'Membership',
+      entidadId: membershipId,
+      descripcion: `${objetivo.user.email}: acceso ${suspender ? 'suspendido' : 'restablecido'}`,
+      antes: { status: objetivo.status },
+      despues: { status },
+    });
+
+    return { suspender };
+  },
+});
 
 export async function cambiarEstado(
   orgSlug: string,
   membershipId: string,
   suspender: boolean,
 ): Promise<EstadoAjustes> {
-  const contexto = await requirePermission(orgSlug, 'user:suspend');
-  const db = tenantClient(contexto.organisation.id);
-
-  const objetivo = await db.membership.findFirst({
-    where: { id: membershipId },
-    select: { id: true, userId: true, role: true },
-  });
-
-  if (!objetivo) return { error: 'No se ha encontrado esa persona.' };
-
-  if (objetivo.userId === contexto.user.id) {
-    return { error: 'No puedes suspender tu propia cuenta.' };
-  }
-
-  if (suspender && objetivo.role === 'OWNER') {
-    const propietarios = await db.membership.count({
-      where: { role: 'OWNER', status: 'ACTIVE', deletedAt: null },
-    });
-
-    if (propietarios <= 1) {
-      return { error: 'La organización debe conservar al menos un propietario activo.' };
-    }
-  }
-
-  await db.membership.update({
-    where: { id: membershipId },
-    data: { status: suspender ? 'SUSPENDED' : 'ACTIVE' },
-  });
-
-  revalidatePath(`/${orgSlug}/ajustes/usuarios`);
+  const resultado = await accionCambiarEstado(orgSlug, { membershipId, suspender });
+  if (!resultado.ok) return { error: resultado.error };
   return { exito: suspender ? 'Acceso suspendido.' : 'Acceso restablecido.' };
 }
 
@@ -247,6 +297,31 @@ export async function desactivarMfa(orgSlug: string): Promise<EstadoMfa> {
   await db.user.update({
     where: { id: contexto.user.id },
     data: { mfaEnabled: false, mfaSecret: null, mfaEnrolledAt: null, mfaRecoveryCodes: [] },
+  });
+
+  // Turning the second factor off is the single change an attacker most wants
+  // unrecorded, so it is audited even though the user row it touches is not
+  // tenant-scoped and therefore cannot share the write's transaction.
+  const tenant = tenantClient(contexto.organisation.id);
+  await tenant.$transaction(async (tx) => {
+    await registrarEvento(
+      tx,
+      {
+        organisationId: contexto.organisation.id,
+        actorId: contexto.user.id,
+        actorEmail: contexto.user.email,
+        actorRol: contexto.actor.role,
+      },
+      {
+        tipo: 'MODIFICACION',
+        accion: 'seguridad.desactivar_mfa',
+        entidad: 'User',
+        entidadId: contexto.user.id,
+        descripcion: `${contexto.user.email} desactivó la verificación en dos pasos`,
+        antes: { mfaEnabled: true },
+        despues: { mfaEnabled: false },
+      },
+    );
   });
 
   revalidatePath(`/${orgSlug}/ajustes/seguridad`);

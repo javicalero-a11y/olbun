@@ -3,7 +3,7 @@ import 'server-only';
 import { cargarCalendarios } from '@/lib/db/calendarios';
 import { planificarPasos } from '@/lib/domain/expedientes/planificacion';
 import type { FechaCivil } from '@/lib/domain/fecha';
-import type { TenantClient } from '@/lib/db/tenant';
+import type { TenantTransactionClient } from '@/lib/db/tenant';
 
 /**
  * Opening an expediente instantiates its procedure template: the whole
@@ -26,7 +26,10 @@ export function aDate(valor: FechaCivil): Date {
 }
 
 /** Next reference in the EXP-YYYY-NNNN series, per organisation and year. */
-export async function siguienteReferencia(db: TenantClient, anio: number): Promise<string> {
+export async function siguienteReferencia(
+  db: TenantTransactionClient,
+  anio: number,
+): Promise<string> {
   const prefijo = `EXP-${String(anio)}-`;
 
   const ultimo = await db.expediente.findFirst({
@@ -65,7 +68,7 @@ export interface AbrirExpedienteResultado {
 }
 
 export async function abrirExpediente(
-  db: TenantClient,
+  db: TenantTransactionClient,
   organisationId: string,
   datos: AbrirExpedienteDatos,
 ): Promise<AbrirExpedienteResultado> {
