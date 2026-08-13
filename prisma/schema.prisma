@@ -122,6 +122,9 @@ model Organisation {
   incidencias          Incidencia[]
   riesgos              Riesgo[]
   accionesCorrectoras  AccionCorrectora[]
+  tiposDocumento       TipoDocumento[]
+  documentos           Documento[]
+  versionesDocumento   VersionDocumento[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -599,6 +602,7 @@ model Contrato {
   comunicaciones Comunicacion[]
   incidencias    Incidencia[]
   riesgos        Riesgo[]
+  documentos     Documento[]
 
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
@@ -858,6 +862,7 @@ model Expediente {
   origenDetecciones Deteccion[]
   incidencias       Incidencia[]
   riesgos           Riesgo[]
+  documentos        Documento[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado])
@@ -1359,6 +1364,7 @@ model Incidencia {
   expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
   acciones     AccionCorrectora[]
   riesgos      Riesgo[]
+  documentos   Documento[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado, fechaHecho])
@@ -1510,4 +1516,129 @@ model AccionCorrectora {
   @@index([incidenciaId])
   @@index([riesgoId])
   @@map("acciones_correctoras")
+}
+
+/// Antivirus verdict on a stored file (SPEC §4.6).
+enum EstadoAnalisis {
+  PENDIENTE
+  LIMPIO
+  INFECTADO
+  NO_ANALIZADO
+}
+
+/// A kind of document, configurable per tenant and seeded in Spanish.
+///
+/// Retention lives here rather than on each document: policy is a property of
+/// the class of document, and putting it on the instance is how two invoices
+/// end up with different retention because two people typed different numbers.
+model TipoDocumento {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nombre         String
+  codigo         String
+  /// Years to keep it after the retention clock starts. Null means "no policy
+  /// yet", which is different from "keep forever" and is shown as such.
+  retencionAnios Int?
+  /// Whether the tenant may delete it before retention expires.
+  esObligatorio  Boolean @default(false)
+  esDelSistema   Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  documentos   Documento[]
+
+  @@unique([organisationId, codigo])
+  @@map("tipos_documento")
+}
+
+/// A document: the identity, the classification and the links (SPEC §4.6).
+///
+/// The bytes are not here. A document is a named thing with a history, and its
+/// history is a list of versions — so the current content is "the newest
+/// version", never a column on this row that an update could quietly replace.
+model Documento {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nombre      String
+  descripcion String?
+  tipoId      String?
+
+  /// What it belongs to. All optional and not mutually exclusive: a resolution
+  /// belongs to an expediente and to the contract underneath it.
+  contratoId   String?
+  expedienteId String?
+  incidenciaId String?
+
+  /// Set when the document is evidence somebody must not delete — a retention
+  /// hold in the litigation sense. Blocks deletion regardless of policy.
+  bloqueadoPorLitigio Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  tipo         TipoDocumento?     @relation(fields: [tipoId], references: [id], onDelete: SetNull)
+  contrato     Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  incidencia   Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+  versiones    VersionDocumento[]
+
+  @@index([organisationId, createdAt])
+  @@index([expedienteId])
+  @@index([contratoId])
+  @@index([incidenciaId])
+  @@map("documentos")
+}
+
+/// One version's bytes and their provenance.
+///
+/// Append-only in spirit and nearly so in fact: a new upload is a new row, and
+/// nothing rewrites an existing one except the antivirus verdict, which is a
+/// fact about the file that arrives after it was stored. `deletedAt` exists
+/// only so a retention purge can record that the bytes went.
+///
+/// `sha256` is both the integrity check and the object key, so a version whose
+/// bytes were tampered with cannot be served: the read verifies the hash.
+model VersionDocumento {
+  id             String @id @default(cuid(2))
+  organisationId String
+  documentoId    String
+
+  /// 1, 2, 3… per document. The newest is the current one.
+  numero     Int
+  nombre     String
+  mimeType   String
+  tamano     Int
+  sha256     String
+  /// Key in object storage. Content-addressed, so two versions with identical
+  /// bytes share it.
+  storageKey String
+
+  estadoAnalisis EstadoAnalisis @default(PENDIENTE)
+  analizadoEn    DateTime?
+  /// What the scanner said when it refused it. Kept for the audit trail.
+  motivoAnalisis String?
+
+  /// Extracted for search. Null until extraction runs, empty for a file that
+  /// genuinely has no text.
+  textoExtraido String?
+
+  createdAt   DateTime  @default(now())
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  documento    Documento    @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, numero])
+  @@index([organisationId, sha256])
+  @@map("versiones_documento")
 }

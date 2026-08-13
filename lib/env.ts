@@ -69,6 +69,18 @@ const serverSchema = z.object({
    * certainly not spend money because somebody added a key to their `.env`.
    */
   MOTOR_DETECCION: z.enum(['claude', 'reglas']).optional(),
+
+  /**
+   * Object storage for documents (M9). S3-compatible: MinIO in development,
+   * real S3 or equivalent in production. Required — unlike the optional
+   * sign-in providers, a document store that silently is not there would mean
+   * uploads that appear to work and evidence that is not kept.
+   */
+  S3_ENDPOINT: z.url().default('http://localhost:9000'),
+  S3_REGION: z.string().min(1).default('us-east-1'),
+  S3_BUCKET: z.string().min(1).default('olbun-documentos'),
+  S3_ACCESS_KEY: z.string().min(1).default('olbun'),
+  S3_SECRET_KEY: z.string().min(1).default('olbun-desarrollo'),
 });
 
 const serverSchemaValidado = serverSchema.refine(

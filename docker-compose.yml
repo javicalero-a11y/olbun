@@ -1,8 +1,8 @@
 name: olbun
 
-# Local development dependencies only. Redis (BullMQ) arrives in M5 and MinIO
-# (document storage) in M6; they are deliberately absent until something uses
-# them. Integration tests spin up their own Postgres via Testcontainers.
+# Local development dependencies only. Redis (BullMQ) is still absent because
+# nothing queues work yet. Integration tests spin up their own Postgres via
+# Testcontainers.
 
 services:
   postgres:
@@ -27,5 +27,30 @@ services:
       retries: 10
       start_period: 10s
 
+  # Object storage for documents (M9). S3-compatible, so the same client code
+  # runs against MinIO here and against real S3 in production — the only
+  # difference is the endpoint and the credentials.
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: olbun-minio
+    restart: unless-stopped
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: olbun
+      MINIO_ROOT_PASSWORD: olbun-desarrollo
+    ports:
+      - '9000:9000'
+      # Console, for looking at what actually got written during development.
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   postgres-data:
+  minio-data:

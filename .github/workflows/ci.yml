@@ -16,6 +16,10 @@ env:
   AUTH_SECRET: ci-secret-not-used-for-anything-real-000000
   ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   NODE_ENV: test
+  S3_ENDPOINT: http://localhost:9000
+  S3_BUCKET: olbun-documentos
+  S3_ACCESS_KEY: olbun
+  S3_SECRET_KEY: olbun-desarrollo
 
 jobs:
   verify:
@@ -40,6 +44,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      # Document storage (M9). Started as a step rather than a service
+      # container because the MinIO image needs a command (`server /data`) and
+      # service containers cannot pass one. The storage tests run against a
+      # real S3 implementation rather than a mock, so CI needs one.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=olbun -e MINIO_ROOT_PASSWORD=olbun-desarrollo \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 1
+          done
 
       - uses: pnpm/action-setup@v4
 
@@ -96,6 +114,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+
+      # Document storage (M9). Started as a step rather than a service
+      # container because the MinIO image needs a command (`server /data`) and
+      # service containers cannot pass one. The storage tests run against a
+      # real S3 implementation rather than a mock, so CI needs one.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=olbun -e MINIO_ROOT_PASSWORD=olbun-desarrollo \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 1
+          done
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:

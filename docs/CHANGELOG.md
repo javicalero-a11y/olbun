@@ -4,6 +4,25 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M9 — Documentos y evidencia, primera parte (2026-08-13)
+
+- MinIO en `docker-compose` y en CI. El mismo código habla con MinIO en local y
+  con S3 en producción: sólo cambian el endpoint y las credenciales.
+- **Las claves son el sha256 del contenido.** El mismo fichero subido dos veces
+  ocupa un objeto, un renombrado no deja nada huérfano y la clave es, además,
+  la suma de verificación.
+- **Nada se sobrescribe.** Volver a subir crea la versión 2 y deja intacta la 1,
+  bytes incluidos. La pregunta suele ser qué decía en marzo.
+- Al leer se comprueba la huella y, si no cuadra, no se entrega el fichero: no
+  se sirve como prueba algo que no se puede acreditar.
+- Descarga por Route Handler con su permiso, su comprobación de tenant y su
+  evento de auditoría: quién se llevó qué documento y cuándo.
+- Catálogo de tipos documentales sembrado en español, con los años de
+  conservación de cada uno. Un documento sin clasificar dice «sin política» en
+  vez de aparentar que tiene una.
+- Queda para la siguiente tanda: antivirus, extracción de texto, búsqueda,
+  purga por retención y exportación del expediente en zip.
+
 ## M10 — Riesgos e incidencias (2026-08-13)
 
 Cierra el cabo suelto de M7: confirmar una detección cuyo destino era una
