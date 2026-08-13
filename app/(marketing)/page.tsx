@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+
+import { Logotipo } from '@/components/features/app/logotipo';
 
 export const metadata: Metadata = {
   title: 'Olbun — riesgo, incidencias y litigios para contratistas públicos',
@@ -22,10 +25,33 @@ const pilares = [
   },
 ];
 
+/**
+ * The public front page.
+ *
+ * It carried no links at all until somebody landed on it and had no way to
+ * reach the product — you had to know to type `/acceso`. A marketing page
+ * whose only job is to send people into the application should say so above
+ * the fold and again at the end.
+ */
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col justify-center px-6 py-24">
-      <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">Olbun</p>
+      <header className="mb-14 flex items-center justify-between gap-4">
+        <Logotipo />
+
+        <nav aria-label="Acceso" className="flex items-center gap-4 text-sm">
+          <Link href="/acceso" className="font-medium underline-offset-4 hover:underline">
+            Entrar
+          </Link>
+          <Link
+            href="/registro"
+            className="rounded-md border border-input px-3 py-1.5 font-medium transition-colors hover:bg-accent"
+          >
+            Crear cuenta
+          </Link>
+        </nav>
+      </header>
+
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
         Ni un vencimiento perdido.
       </h1>
@@ -44,8 +70,18 @@ export default function HomePage() {
         ))}
       </dl>
 
-      <p className="mt-14 text-xs text-muted-foreground">
-        Hito M0 — fundación. El acceso llega en M1.
+      <p className="mt-14 text-sm">
+        <Link href="/acceso" className="font-medium underline underline-offset-4">
+          Entrar en tu espacio de trabajo
+        </Link>
+        <span className="text-muted-foreground">
+          {' '}
+          — o{' '}
+          <Link href="/registro" className="underline underline-offset-4">
+            crear una cuenta
+          </Link>
+          .
+        </span>
       </p>
     </main>
   );
