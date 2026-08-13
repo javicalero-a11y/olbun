@@ -1,4 +1,11 @@
-import type { Jurisdiccion, TipoDeteccion, TipoExpediente } from '@prisma/client';
+import type {
+  CategoriaRiesgo,
+  GravedadIncidencia,
+  Jurisdiccion,
+  TipoDeteccion,
+  TipoExpediente,
+  TipoIncidencia,
+} from '@prisma/client';
 
 /**
  * The catalogue of things worth spotting in correspondence (SPEC §4.4).
@@ -14,7 +21,8 @@ import type { Jurisdiccion, TipoDeteccion, TipoExpediente } from '@prisma/client
 export type DestinoConfirmacion =
   /** Opens an expediente from its procedure template (SPEC §4.5). */
   | 'EXPEDIENTE'
-  /** Becomes an incidencia or a risk — both arrive with M10. */
+  /** Becomes an incidencia (something that happened) or a riesgo (something
+   * that has not) — SPEC §4.6. */
   | 'INCIDENCIA'
   | 'RIESGO'
   /**
@@ -41,6 +49,10 @@ export interface DefinicionTipo {
    * mapping to a kind of expediente that does not exist fails to compile.
    */
   expediente?: { tipo: TipoExpediente; jurisdiccion: Jurisdiccion };
+  /** For `INCIDENCIA`, what kind of incident and how serious to open it as. */
+  incidencia?: { tipo: TipoIncidencia; gravedad: GravedadIncidencia };
+  /** For `RIESGO`, which family of the register it belongs to. */
+  riesgo?: { categoria: CategoriaRiesgo };
   /** What the engine should look for. Goes into the prompt verbatim. */
   senales: string;
 }
@@ -133,6 +145,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     descripcion: 'Se afirma que el servicio no cumple lo pactado, sin abrir aún expediente.',
     gravedad: 0.55,
     destino: 'INCIDENCIA',
+    incidencia: { tipo: 'FALLO_SERVICIO', gravedad: 'MODERADA' },
     senales:
       'incumplimiento del pliego, no se ha prestado el servicio, deficiencias reiteradas, falta de personal',
   },
@@ -141,6 +154,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     descripcion: 'Queja registrada por el poder adjudicador o por un centro.',
     gravedad: 0.4,
     destino: 'INCIDENCIA',
+    incidencia: { tipo: 'QUEJA_USUARIO', gravedad: 'LEVE' },
     senales: 'queja formal, escrito de queja, reiteramos la queja, registro de entrada',
   },
   RECLAMACION_USUARIO: {
@@ -148,6 +162,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     descripcion: 'Un usuario del servicio reclama por el trato o la prestación.',
     gravedad: 0.35,
     destino: 'INCIDENCIA',
+    incidencia: { tipo: 'QUEJA_USUARIO', gravedad: 'LEVE' },
     senales:
       'hoja de reclamaciones, usuario del servicio, reclamación del residente o del familiar',
   },
@@ -156,6 +171,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     descripcion: 'Se señala un riesgo laboral, un accidente o un incumplimiento de PRL.',
     gravedad: 0.75,
     destino: 'RIESGO',
+    riesgo: { categoria: 'PREVENCION' },
     senales:
       'riesgo grave e inminente, accidente de trabajo, evaluación de riesgos, coordinación de actividades empresariales',
   },

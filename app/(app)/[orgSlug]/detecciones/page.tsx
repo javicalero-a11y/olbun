@@ -149,6 +149,7 @@ export default async function DeteccionesPage({
         esBajaConfianza: esBajaConfianza(deteccion.confianza),
         abreExpediente: definicion.destino === 'EXPEDIENTE',
         destino: destinoLegible(definicion.destino),
+        verboConfirmar: verboDe(definicion.destino),
         comunicacion: {
           id: deteccion.comunicacion.id,
           asunto: deteccion.comunicacion.asunto,
@@ -184,27 +185,32 @@ export default async function DeteccionesPage({
         </p>
       </div>
 
-      {filas.length === 0 ? (
-        <div className="rounded-lg border border-border p-8 text-center">
-          <h2 className="text-sm font-semibold">La cola está vacía</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Aquí aparece lo que se detecta en los mensajes: preavisos de penalidad,
-            requerimientos con plazo, expedientes sancionadores. Sube un correo a la bandeja y
-            pulsa «Analizar» para llenarla.
-          </p>
-          <p className="mt-4 text-sm">
-            <Link href={`/${orgSlug}/comunicaciones`} className="underline underline-offset-4">
-              Ir a comunicaciones
-            </Link>
-          </p>
-        </div>
-      ) : (
-        <ColaDetecciones
-          filas={principales}
-          confirmar={accionConfirmar}
-          descartar={accionDescartar}
-        />
-      )}
+      {/* Always rendered, even with nothing in it: the list holds the message
+          saying what the last decision created, and swapping it out for a
+          separate empty state here would throw that message away. */}
+      <ColaDetecciones
+        filas={principales}
+        confirmar={accionConfirmar}
+        descartar={accionDescartar}
+        vacio={
+          <div className="rounded-lg border border-border p-8 text-center">
+            <h2 className="text-sm font-semibold">La cola está vacía</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Aquí aparece lo que se detecta en los mensajes: preavisos de penalidad,
+              requerimientos con plazo, expedientes sancionadores. Sube un correo a la bandeja y
+              pulsa «Analizar» para llenarla.
+            </p>
+            <p className="mt-4 text-sm">
+              <Link
+                href={`/${orgSlug}/comunicaciones`}
+                className="underline underline-offset-4"
+              >
+                Ir a comunicaciones
+              </Link>
+            </p>
+          </div>
+        }
+      />
 
       {bajas.length > 0 ? (
         <details className="rounded-lg border border-border p-4">
@@ -229,10 +235,24 @@ export default async function DeteccionesPage({
 function destinoLegible(destino: string): string {
   switch (destino) {
     case 'INCIDENCIA':
-      return 'se registrará como incidencia cuando exista ese módulo';
+      return 'Esto no abre un expediente: queda registrado como incidencia, con la fecha del hecho que confirmes.';
     case 'RIESGO':
-      return 'se registrará en la matriz de riesgos cuando exista';
+      return 'Esto no abre un expediente: entra en el registro de riesgos sin valorar, para que alguien lo puntúe.';
     default:
-      return 'queda anotado para que una persona decida dónde encaja';
+      return 'Esto no crea nada: queda anotado para que una persona compruebe en qué se funda el plazo.';
+  }
+}
+
+/** The verb on the submit button — what pressing it will actually do. */
+function verboDe(destino: string): string {
+  switch (destino) {
+    case 'EXPEDIENTE':
+      return 'Abrir expediente';
+    case 'INCIDENCIA':
+      return 'Registrar incidencia';
+    case 'RIESGO':
+      return 'Añadir al registro';
+    default:
+      return 'Confirmar y anotar';
   }
 }

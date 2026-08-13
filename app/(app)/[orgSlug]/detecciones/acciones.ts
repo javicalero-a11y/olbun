@@ -153,7 +153,10 @@ const accionConfirmar = crearAccion({
       despues: { ...evidencia, resultado },
     });
 
-    if (resultado.estado === 'CONVERTIDA') {
+    // Whatever the confirmation created is audited as its own creation, with
+    // the detection's evidence attached: the record has to be able to show
+    // which sentence in which letter a person acted on.
+    if (resultado.destino === 'EXPEDIENTE') {
       auditar({
         tipo: 'CREACION',
         accion: 'expediente.abrir',
@@ -164,6 +167,21 @@ const accionConfirmar = crearAccion({
           referencia: resultado.referencia,
           hitos: resultado.hitos,
           plazos: resultado.plazos,
+          origenDeteccionId: datos.deteccionId,
+          ...evidencia,
+        },
+      });
+    }
+
+    if (resultado.destino === 'INCIDENCIA' || resultado.destino === 'RIESGO') {
+      auditar({
+        tipo: 'CREACION',
+        accion: resultado.destino === 'INCIDENCIA' ? 'incidencia.crear' : 'riesgo.crear',
+        entidad: resultado.destino === 'INCIDENCIA' ? 'Incidencia' : 'Riesgo',
+        entidadId: resultado.registroId,
+        descripcion: `${resultado.referencia} — creado desde una detección confirmada`,
+        despues: {
+          referencia: resultado.referencia,
           origenDeteccionId: datos.deteccionId,
           ...evidencia,
         },
@@ -189,7 +207,7 @@ export async function confirmar(
     return resultado.errores ? { errores: resultado.errores } : { error: resultado.error };
   }
 
-  if (resultado.datos.estado === 'CONVERTIDA') {
+  if (resultado.datos.destino === 'EXPEDIENTE') {
     const { referencia, plazos } = resultado.datos;
     return {
       exito:
@@ -199,9 +217,20 @@ export async function confirmar(
     };
   }
 
+  if (resultado.datos.destino === 'INCIDENCIA') {
+    return { exito: `Incidencia ${resultado.datos.referencia} registrada.` };
+  }
+
+  if (resultado.datos.destino === 'RIESGO') {
+    return {
+      exito: `Riesgo ${resultado.datos.referencia} añadido al registro, pendiente de valorar.`,
+    };
+  }
+
+  // Only PLAZO_MENCIONADO reaches here, and it creates nothing on purpose: a
+  // date in a letter is not a plazo until somebody checks what it rests on.
   return {
-    exito:
-      'Confirmada. El registro de incidencias y riesgos llega en un hito posterior; de momento queda anotada.',
+    exito: 'Confirmada. Comprueba el fundamento antes de llevar el plazo a un expediente.',
   };
 }
 

@@ -119,6 +119,9 @@ model Organisation {
   comunicaciones       Comunicacion[]
   adjuntos             Adjunto[]
   detecciones          Deteccion[]
+  incidencias          Incidencia[]
+  riesgos              Riesgo[]
+  accionesCorrectoras  AccionCorrectora[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -594,6 +597,8 @@ model Contrato {
 
   buzones        BuzonConectado[]
   comunicaciones Comunicacion[]
+  incidencias    Incidencia[]
+  riesgos        Riesgo[]
 
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
@@ -851,6 +856,8 @@ model Expediente {
   /// The detections that led here. SPEC calls this `origenDeteccionId`; it
   /// lives on `Deteccion` so the link is a relation (ADR 0004).
   origenDetecciones Deteccion[]
+  incidencias       Incidencia[]
+  riesgos           Riesgo[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado])
@@ -1263,4 +1270,244 @@ model Deteccion {
   @@unique([organisationId, comunicacionId, tipo])
   @@index([organisationId, estado, confianza])
   @@map("detecciones")
+}
+
+/// What happened (SPEC §4.6). The list is the one a prevention officer and a
+/// contract manager both recognise, because the same event is often reportable
+/// under two regimes at once.
+enum TipoIncidencia {
+  ACCIDENTE
+  INCIDENTE_SIN_BAJA
+  DANO_MATERIAL
+  FALLO_SERVICIO
+  QUEJA_USUARIO
+  AGRESION
+  MEDIOAMBIENTAL
+  VEHICULO
+  SEGURIDAD_DATOS
+}
+
+enum GravedadIncidencia {
+  LEVE
+  MODERADA
+  GRAVE
+  MUY_GRAVE
+}
+
+enum EstadoIncidencia {
+  ABIERTA
+  EN_INVESTIGACION
+  CERRADA
+  REABIERTA
+}
+
+/// An operational fact (SPEC §4.6).
+///
+/// Separate from `Expediente` on purpose: most incidents never become a
+/// procedure, and the ones that do need the record of what happened to have
+/// existed *before* anybody was arguing about it. `expedienteId` is the link
+/// for when one escalates.
+///
+/// `personasImplicadas` holds names and roles of people involved — Article 9
+/// data when the incident is an accident or an assault. It is encrypted at
+/// rest by the application (M11's key), and until that lands it stays null
+/// rather than being written in clear.
+model Incidencia {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  /// Auto-numbered per organisation and year: INC-2026-0001.
+  referencia String
+
+  contratoId String?
+
+  tipo     TipoIncidencia
+  gravedad GravedadIncidencia
+  estado   EstadoIncidencia   @default(ABIERTA)
+
+  /// When it happened, and when we were told — rarely the same, and the gap
+  /// is itself evidence in a dispute about diligence.
+  fechaHecho        DateTime
+  fechaComunicacion DateTime?
+
+  lugar             String?
+  descripcion       String
+  medidasInmediatas String?
+
+  /// JSONB, encrypted by the application. Null until M11 provides the key.
+  personasImplicadas Json?
+
+  /// Told the contracting authority. A penalty for late notice usually turns
+  /// on this and its date.
+  comunicadaAlOrgano      Boolean   @default(false)
+  fechaComunicacionOrgano DateTime?
+  /// Reportable to a public authority — Delt@ for accidents, the AEPD for a
+  /// data breach. A flag a person sets, never inferred.
+  esNotificableAAutoridad Boolean   @default(false)
+
+  expedienteId String?
+  /// The detection this came from, when a person confirmed one.
+  deteccionId  String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato     Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  acciones     AccionCorrectora[]
+  riesgos      Riesgo[]
+
+  @@unique([organisationId, referencia])
+  @@index([organisationId, estado, fechaHecho])
+  @@index([contratoId])
+  @@map("incidencias")
+}
+
+/// Where a risk sits. Kept as an enum rather than a table: these are the
+/// families a contractor's risk register actually uses, and a tenant inventing
+/// a sixteenth category is a problem we have not got yet.
+enum CategoriaRiesgo {
+  CONTRACTUAL
+  LABORAL
+  PREVENCION
+  ECONOMICO
+  OPERATIVO
+  REPUTACIONAL
+  CUMPLIMIENTO
+  PROTECCION_DATOS
+}
+
+/// How the organisation intends to deal with it. The four standard responses.
+enum RespuestaRiesgo {
+  EVITAR
+  MITIGAR
+  TRANSFERIR
+  ACEPTAR
+}
+
+enum EstadoRiesgo {
+  IDENTIFICADO
+  EN_TRATAMIENTO
+  CONTROLADO
+  MATERIALIZADO
+  CERRADO
+}
+
+/// Something that has not happened yet (SPEC §4.6).
+///
+/// Written as cause → event → consequence rather than one free-text line,
+/// because "riesgo de penalidad" is not a risk anybody can act on, and the
+/// three parts are what make the difference between a register that gets
+/// reviewed and one that gets filed.
+///
+/// Scores are stored as the 1–5 inputs, never as the product. The matrix
+/// bands are the application's to change; a stored total would freeze
+/// yesterday's matrix into the data.
+model Riesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  referencia String
+
+  categoria  CategoriaRiesgo
+  contratoId String?
+
+  causa        String
+  evento       String
+  consecuencia String
+
+  /// 1–5 each, before any control is applied.
+  probabilidadInherente Int
+  impactoInherente      Int
+
+  respuesta RespuestaRiesgo @default(MITIGAR)
+  controles String?
+
+  /// 1–5 each, after the controls above. Null until somebody has assessed
+  /// them — an unassessed residual is not the same as an unchanged one.
+  probabilidadResidual Int?
+  impactoResidual      Int?
+
+  estado EstadoRiesgo @default(IDENTIFICADO)
+
+  responsableId   String?
+  /// Risk registers rot. This is the date somebody has to look again.
+  proximaRevision DateTime? @db.Date
+  ultimaRevision  DateTime? @db.Date
+
+  /// Set when the risk stopped being hypothetical.
+  incidenciaId String?
+  expedienteId String?
+  deteccionId  String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato     Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  incidencia   Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+  expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  acciones     AccionCorrectora[]
+
+  @@unique([organisationId, referencia])
+  @@index([organisationId, estado])
+  @@index([organisationId, proximaRevision])
+  @@index([contratoId])
+  @@map("riesgos")
+}
+
+enum EstadoAccion {
+  PENDIENTE
+  EN_CURSO
+  COMPLETADA
+  VERIFICADA
+  CANCELADA
+}
+
+/// What somebody committed to do about it (SPEC §12, M10).
+///
+/// Hangs off an incidencia or a riesgo — at least one, and the check that
+/// enforces "at least one" lives in the database, because an action attached
+/// to nothing is invisible to every screen that would have shown it.
+///
+/// `VERIFICADA` is deliberately distinct from `COMPLETADA`: an ISO 9001 or
+/// 45001 audit asks who checked that the fix worked, and "we did it" is not an
+/// answer to that question.
+model AccionCorrectora {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  incidenciaId String?
+  riesgoId     String?
+
+  descripcion String
+  estado      EstadoAccion @default(PENDIENTE)
+
+  responsableId String?
+  fechaLimite   DateTime? @db.Date
+  fechaCierre   DateTime? @db.Date
+
+  /// Who confirmed it actually worked, and when.
+  verificadaPorId String?
+  verificadaEn    DateTime?
+  eficacia        String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  incidencia   Incidencia?  @relation(fields: [incidenciaId], references: [id], onDelete: Cascade)
+  riesgo       Riesgo?      @relation(fields: [riesgoId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, estado, fechaLimite])
+  @@index([incidenciaId])
+  @@index([riesgoId])
+  @@map("acciones_correctoras")
 }

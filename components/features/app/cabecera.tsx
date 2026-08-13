@@ -22,6 +22,8 @@ const SECCIONES = [
   { titulo: 'Plazos', ruta: 'plazos' },
   { titulo: 'Comunicaciones', ruta: 'comunicaciones' },
   { titulo: 'Detecciones', ruta: 'detecciones' },
+  { titulo: 'Incidencias', ruta: 'incidencias' },
+  { titulo: 'Riesgos', ruta: 'riesgos' },
 ];
 
 export function CabeceraApp({ organisation, organisations, user, rol, tema }: CabeceraProps) {

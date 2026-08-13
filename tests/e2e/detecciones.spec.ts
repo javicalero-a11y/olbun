@@ -50,7 +50,7 @@ async function subirYAnalizar(page: Page, slug: string, archivo = 'penalidad.eml
 
   const analizar = page.getByRole('button', { name: 'Analizar' }).first();
   await analizar.click();
-  await expect(page.getByText(/detecciones? en la cola|nada que señalar/)).toBeVisible();
+  await expect(page.getByText(/detecci[oó]n(es)? en la cola|nada que señalar/)).toBeVisible();
 }
 
 test.describe('Detección', () => {
@@ -178,7 +178,7 @@ test.describe('Detección', () => {
     // Volver a analizar el mismo mensaje: la decisión de la persona manda.
     await page.goto(`/${cred.slug}/comunicaciones`);
     await page.getByRole('button', { name: 'Analizar' }).first().click();
-    await expect(page.getByText(/detecciones? en la cola|nada que señalar/)).toBeVisible();
+    await expect(page.getByText(/detecci[oó]n(es)? en la cola|nada que señalar/)).toBeVisible();
 
     await page.goto(`/${cred.slug}/detecciones`);
     await expect(page.getByRole('heading', { name: 'Preaviso de penalidad' })).toHaveCount(0);

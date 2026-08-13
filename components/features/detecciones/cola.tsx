@@ -31,6 +31,9 @@ export interface FilaDeteccion {
   abreExpediente: boolean;
   /** Where confirming sends it when it is not an expediente. */
   destino: string;
+  /** The submit label. Distinct per destination so the button says what
+   * it will actually do, rather than a generic «Confirmar». */
+  verboConfirmar: string;
   comunicacion: {
     id: string;
     asunto: string;
@@ -58,10 +61,17 @@ function porcentaje(valor: number): string {
 
 export function ColaDetecciones({
   filas,
+  vacio,
   confirmar,
   descartar,
 }: {
   filas: FilaDeteccion[];
+  /**
+   * Shown when there is nothing left. Rendered here rather than by the page,
+   * because the page swapping to its own empty state would unmount this list
+   * — and with it the message saying what the last decision just created.
+   */
+  vacio?: React.ReactNode;
   confirmar: AccionFormulario;
   descartar: AccionFormulario;
 }) {
@@ -166,11 +176,17 @@ export function ColaDetecciones({
     return (
       <div className="space-y-3">
         {banner}
-        <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
-          {filas.length === 0
-            ? 'No hay nada pendiente de revisar.'
-            : 'Has aplazado todo lo pendiente. Vuelve a cargar la página para verlo de nuevo.'}
-        </p>
+        {filas.length === 0 ? (
+          (vacio ?? (
+            <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
+              No hay nada pendiente de revisar.
+            </p>
+          ))
+        ) : (
+          <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
+            Has aplazado todo lo pendiente. Vuelve a cargar la página para verlo de nuevo.
+          </p>
+        )}
       </div>
     );
   }
@@ -409,11 +425,10 @@ function Fila({
             </>
           ) : (
             <>
-              {/* Not an expediente, but the action's schema still wants a date. */}
+              {/* Not an expediente, but the record still needs a date and the
+                  action's schema still wants one. */}
               <input type="hidden" name="fechaApertura" value={fila.fechaSugerida} />
-              <p className="text-xs text-muted-foreground">
-                Esto no abre un expediente: {fila.destino}. Queda confirmada y anotada.
-              </p>
+              <p className="text-xs text-muted-foreground">{fila.destino}</p>
             </>
           )}
 
@@ -423,11 +438,7 @@ function Fila({
               disabled={confirmando}
               className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
-              {confirmando
-                ? 'Confirmando…'
-                : fila.abreExpediente
-                  ? 'Abrir expediente'
-                  : 'Confirmar'}
+              {confirmando ? 'Confirmando…' : fila.verboConfirmar}
             </button>
             <button
               type="button"

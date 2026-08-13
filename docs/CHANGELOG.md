@@ -4,6 +4,27 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M10 — Riesgos e incidencias (2026-08-13)
+
+Cierra el cabo suelto de M7: confirmar una detección cuyo destino era una
+incidencia o un riesgo dejaba constancia de la decisión y no creaba nada. Cinco
+de los catorce tipos acababan ahí.
+
+- `Incidencia` (lo que ha pasado), `Riesgo` (lo que no ha pasado) y
+  `AccionCorrectora`, con RLS y con las comprobaciones en la base de datos: una
+  acción cuelga siempre de una incidencia o de un riesgo, y las puntuaciones
+  van del 1 al 5.
+- Matriz 5×5 en `lib/domain/riesgos`: las bandas se calculan, nunca se guardan,
+  así que retocar la matriz no deja el registro incoherente consigo mismo.
+- «Sin valorar el residual» y «los controles no cambiaron nada» son cosas
+  distintas y el registro las distingue. Ordena por el nivel vigente, que es el
+  residual cuando existe y el inherente cuando nadie lo ha valorado.
+- Un riesgo se escribe como causa, evento y consecuencia. «Riesgo de penalidad»
+  no es algo sobre lo que se pueda actuar.
+- Confirmar una queja, una reclamación o un incumplimiento alegado crea la
+  incidencia con la cita de la carta como descripción; un riesgo de PRL entra
+  en el registro sin valorar, porque el motor no tiene base para puntuarlo.
+
 ## M7 — Detección (2026-08-13)
 
 Cierra el bucle: entra un correo, se señala lo que importa con la frase que lo

@@ -49,6 +49,25 @@ describe('TIPOS_DETECCION', () => {
     }
   });
 
+  it('todo destino dice exactamente qué crea, y sólo eso', () => {
+    // Un destino sin su mapeo cae en el valor por defecto del servicio, que es
+    // una incidencia genérica: se crea algo, nadie ve el error, y el registro
+    // se llena de ruido. Por eso se comprueba aquí y no en la revisión.
+    for (const tipo of TIPOS) {
+      const { destino, expediente, incidencia, riesgo } = TIPOS_DETECCION[tipo];
+
+      expect({ tipo, tiene: Boolean(expediente) }).toEqual({
+        tipo,
+        tiene: destino === 'EXPEDIENTE',
+      });
+      expect({ tipo, tiene: Boolean(incidencia) }).toEqual({
+        tipo,
+        tiene: destino === 'INCIDENCIA',
+      });
+      expect({ tipo, tiene: Boolean(riesgo) }).toEqual({ tipo, tiene: destino === 'RIESGO' });
+    }
+  });
+
   it('un plazo mencionado no crea nada por sí solo', () => {
     // SPEC §6.4: la fecha de un correo no es un Plazo hasta que alguien
     // comprueba en qué se funda.

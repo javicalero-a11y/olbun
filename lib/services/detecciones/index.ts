@@ -2,7 +2,8 @@ import 'server-only';
 
 import { TIPOS_DETECCION } from '@/lib/domain/detecciones/tipos';
 import { verificarExtractos } from '@/lib/domain/detecciones/verificacion';
-import { abrirExpediente } from '@/lib/services/expedientes';
+import { abrirExpediente, aDate } from '@/lib/services/expedientes';
+import { crearIncidencia, crearRiesgo } from '@/lib/services/riesgos';
 import { hayClaveDeClaude, motorClaude } from './claude';
 import { logger } from '@/lib/logger';
 import { motorDeReglas } from './reglas';
@@ -204,16 +205,28 @@ export interface ConfirmarDatos {
   titulo?: string | undefined;
 }
 
+/**
+ * Every variant carries `destino`, so a caller narrows on one field rather
+ * than guessing which shape a `CONVERTIDA` happens to be.
+ */
 export type ResultadoConfirmacion =
   | {
       estado: 'CONVERTIDA';
+      destino: 'EXPEDIENTE';
       expedienteId: string;
       referencia: string;
       hitos: number;
       plazos: number;
     }
-  /** Confirmed, but the record it belongs in does not exist yet (M10). */
-  | { estado: 'CONFIRMADA'; destino: 'INCIDENCIA' | 'RIESGO' | 'NINGUNO' };
+  /** Became an incidencia or a riesgo, which have no timeline of their own. */
+  | {
+      estado: 'CONVERTIDA';
+      destino: 'INCIDENCIA' | 'RIESGO';
+      registroId: string;
+      referencia: string;
+    }
+  /** Agreed with, but there is nothing this type creates. */
+  | { estado: 'CONFIRMADA'; destino: 'NINGUNO' };
 
 /**
  * A person says yes.
@@ -251,20 +264,77 @@ export async function confirmarDeteccion(
   const revisada = { revisadaPorId: datos.revisorId, revisadaEn: new Date() };
   const plantillaExpediente = definicion.expediente;
 
-  // The types whose home is an incidencia or a risk register are confirmed and
-  // left there: those records arrive with M10, and inventing a placeholder for
-  // them would be worse than recording plainly that a person agreed.
-  if (definicion.destino !== 'EXPEDIENTE' || !plantillaExpediente) {
+  const cita = resumenDesdeExtractos(deteccion.extractos);
+
+  // An incidencia: something that already happened, and whose date is the day
+  // the message reporting it was sent — the reviewer confirmed that reading.
+  if (definicion.destino === 'INCIDENCIA') {
+    const incidencia = await crearIncidencia(db, organisationId, {
+      tipo: definicion.incidencia?.tipo ?? 'FALLO_SERVICIO',
+      gravedad: definicion.incidencia?.gravedad ?? 'MODERADA',
+      fechaHecho: aDate(datos.fechaApertura),
+      descripcion: cita ?? `${definicion.etiqueta} — ${deteccion.comunicacion.asunto}`,
+      contratoId: deteccion.comunicacion.contratoId ?? undefined,
+      deteccionId: deteccion.id,
+      creadoPorId: datos.revisorId,
+    });
+
+    await db.deteccion.update({
+      where: { id: deteccion.id },
+      data: { estado: 'CONVERTIDA', ...revisada },
+    });
+    await marcarRevisada(db, deteccion.comunicacion.id);
+
+    return {
+      estado: 'CONVERTIDA',
+      destino: 'INCIDENCIA',
+      registroId: incidencia.id,
+      referencia: incidencia.referencia,
+    };
+  }
+
+  // A riesgo: something that has not happened. It is deliberately created
+  // unscored beyond a placeholder — the engine has no basis for a probability,
+  // and a register full of machine-invented scores is worse than an empty one.
+  if (definicion.destino === 'RIESGO') {
+    const riesgo = await crearRiesgo(db, organisationId, {
+      categoria: definicion.riesgo?.categoria ?? 'OPERATIVO',
+      causa: `Detectado en «${deteccion.comunicacion.asunto}»`,
+      evento: definicion.etiqueta,
+      consecuencia: cita ?? definicion.descripcion,
+      // The midpoint of the matrix, and the reason the register shows every
+      // risk born this way as pending assessment.
+      probabilidadInherente: 3,
+      impactoInherente: 3,
+      contratoId: deteccion.comunicacion.contratoId ?? undefined,
+      deteccionId: deteccion.id,
+      creadoPorId: datos.revisorId,
+    });
+
+    await db.deteccion.update({
+      where: { id: deteccion.id },
+      data: { estado: 'CONVERTIDA', ...revisada },
+    });
+    await marcarRevisada(db, deteccion.comunicacion.id);
+
+    return {
+      estado: 'CONVERTIDA',
+      destino: 'RIESGO',
+      registroId: riesgo.id,
+      referencia: riesgo.referencia,
+    };
+  }
+
+  // Nothing to create — a mentioned deadline is agreed with and left for a
+  // person to place, because a date in a letter is not a plazo (SPEC §6.4).
+  if (!plantillaExpediente) {
     await db.deteccion.update({
       where: { id: deteccion.id },
       data: { estado: 'CONFIRMADA', ...revisada },
     });
     await marcarRevisada(db, deteccion.comunicacion.id);
 
-    return {
-      estado: 'CONFIRMADA',
-      destino: definicion.destino === 'EXPEDIENTE' ? 'NINGUNO' : definicion.destino,
-    };
+    return { estado: 'CONFIRMADA', destino: 'NINGUNO' };
   }
 
   // The tenant's own template for this kind of procedure, if they have one.
@@ -305,6 +375,7 @@ export async function confirmarDeteccion(
 
   return {
     estado: 'CONVERTIDA',
+    destino: 'EXPEDIENTE',
     expedienteId: expediente.expedienteId,
     referencia: expediente.referencia,
     hitos: expediente.hitosCreados,
