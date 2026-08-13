@@ -63,6 +63,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "mailparser": "^3.9.15",
+    "mammoth": "^1.12.1",
     "next": "15.5.23",
     "next-auth": "5.0.0-beta.32",
     "nodemailer": "^9.0.5",

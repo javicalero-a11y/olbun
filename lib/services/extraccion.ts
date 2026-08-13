@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { esTexto, extraerTexto, MAXIMO_CARACTERES } from '@/lib/domain/documentos/texto';
+import { extraerTexto, MAXIMO_CARACTERES } from '@/lib/domain/documentos/texto';
 import { logger } from '@/lib/logger';
 import type { ResultadoExtraccion } from '@/lib/domain/documentos/texto';
 
@@ -8,14 +8,44 @@ import type { ResultadoExtraccion } from '@/lib/domain/documentos/texto';
  * Extraction for the file types that need more than a decode (M9).
  *
  * The pure module in `lib/domain` handles anything whose bytes are already
- * text. This one adds PDFs, which need a parser, and it lives in the service
- * layer because that parser is async and does real work — `lib/domain` stays
- * pure and synchronous.
+ * text. This one adds PDFs and Word documents, which need parsers, and it
+ * lives in the service layer because those parsers are async and do real work
+ * — `lib/domain` stays pure and synchronous.
  *
  * **A PDF with no extractable text is not an error.** It is almost always a
  * scan, and the honest answer is "this needs OCR", not an empty index entry
  * that makes the document look searched when it has not been.
  */
+
+const TIPOS_WORD = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+export function esWord(mimeType: string, nombre: string): boolean {
+  return TIPOS_WORD.includes(mimeType.toLowerCase()) || nombre.toLowerCase().endsWith('.docx');
+}
+
+/**
+ * Pulls the text out of a .docx.
+ *
+ * `.doc` — the pre-2007 binary format — is deliberately not handled. It is a
+ * different format needing a different parser, and half-reading it would put
+ * fragments into the index that look like the document and are not.
+ */
+async function extraerDeWord(contenido: Buffer): Promise<ResultadoExtraccion> {
+  try {
+    const mammoth = await import('mammoth');
+    const { value } = await mammoth.extractRawText({ buffer: contenido });
+
+    const limpio = value
+      .replace(/[ \t]+/g, ' ')
+      .slice(0, MAXIMO_CARACTERES)
+      .trim();
+
+    return limpio === '' ? { estado: 'VACIO' } : { estado: 'EXTRAIDO', texto: limpio };
+  } catch (error) {
+    logger.warn({ error }, 'No se pudo extraer el texto de un .docx');
+    return { estado: 'NO_SOPORTADO', motivo: 'El documento de Word no se ha podido leer.' };
+  }
+}
 
 export function esPdf(mimeType: string, nombre: string): boolean {
   return mimeType.toLowerCase() === 'application/pdf' || nombre.toLowerCase().endsWith('.pdf');
@@ -65,7 +95,7 @@ export async function extraerTextoDeArchivo(
   nombre: string,
 ): Promise<ResultadoExtraccion> {
   if (esPdf(mimeType, nombre)) return extraerDePdf(contenido);
-  if (esTexto(mimeType, nombre)) return extraerTexto(contenido, mimeType, nombre);
+  if (esWord(mimeType, nombre)) return extraerDeWord(contenido);
 
   return extraerTexto(contenido, mimeType, nombre);
 }

@@ -39,8 +39,13 @@ SPEC §12.
 - Extracción de PDF con pdf.js, que es el motor que aguanta los PDF malformados
   que mandan de verdad las administraciones. Un PDF sin texto se marca como
   escaneado que necesita OCR, no como indexado y vacío.
-- Queda para la siguiente tanda: antivirus, OCR de escaneados, ficheros de
-  Word, purga por retención e índice en PDF.
+- Extracción de `.docx` con mammoth: las alegaciones y los escritos llegan casi
+  siempre en Word, así que sin esto media biblioteca quedaba fuera del buscador.
+  El `.doc` antiguo es otro formato y se sigue marcando como no indexado, porque
+  leerlo a medias metería en el índice trozos que parecen el documento y no lo
+  son.
+- Queda para la siguiente tanda: antivirus, OCR de escaneados, purga por
+  retención e índice en PDF.
 
 ## M10 — Riesgos e incidencias (2026-08-13)
 

@@ -6,11 +6,12 @@
  * that silently misses half the documents is worse than one that tells you
  * which ones it could not read.
  *
- * PDFs are handled by `lib/services/extraccion`, which needs a parser and is
- * therefore async; Word files and scans are handled by nobody yet. Pretending
- * to extract from them by pulling the ASCII runs out of a binary would produce
- * exactly the kind of plausible-looking rubbish that makes a search result
- * untrustworthy, so they are recorded as unextracted and the screen says so.
+ * PDFs and .docx are handled by `lib/services/extraccion`, which needs parsers
+ * and is therefore async; scans and the old binary .doc are handled by nobody.
+ * Pretending to extract from those by pulling the ASCII runs out of a binary
+ * would produce exactly the kind of plausible-looking rubbish that makes a
+ * search result untrustworthy, so they are recorded as unextracted and the
+ * screen says so.
  */
 
 export type ResultadoExtraccion =
@@ -46,7 +47,7 @@ const MOTIVOS: Readonly<Record<string, string>> = {
     'Este PDF no se ha podido leer aquí; lo intenta el extractor del servicio.',
   'application/msword': 'Los .doc necesitan un extractor propio.',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-    'Los .docx necesitan un extractor propio.',
+    'Este .docx no se ha podido leer aquí; lo intenta el extractor del servicio.',
   'application/vnd.ms-excel': 'Las hojas de cálculo necesitan un extractor propio.',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
     'Las hojas de cálculo necesitan un extractor propio.',
