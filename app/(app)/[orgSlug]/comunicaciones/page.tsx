@@ -3,6 +3,8 @@ import Link from 'next/link';
 
 import { requirePermission } from '@/lib/auth/guardias';
 import { tenantClient } from '@/lib/db/tenant';
+import { analizarComunicacionAccion } from '../detecciones/acciones';
+import { BotonAnalizar } from '@/components/features/detecciones/boton-analizar';
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 import { FormularioSubida } from '@/components/features/comunicaciones/formulario-subida';
 import { subirComunicacion } from './acciones';
@@ -48,7 +50,7 @@ export default async function ComunicacionesPage({
         direccion: true,
         estadoRevision: true,
         contrato: { select: { numeroExpediente: true } },
-        _count: { select: { adjuntos: true } },
+        _count: { select: { adjuntos: true, detecciones: true } },
       },
       orderBy: [{ estadoRevision: 'asc' }, { fechaRecepcion: 'desc' }],
       take: 200,
@@ -61,6 +63,7 @@ export default async function ComunicacionesPage({
   ]);
 
   const accion = subirComunicacion.bind(null, orgSlug);
+  const accionAnalizar = analizarComunicacionAccion.bind(null, orgSlug);
 
   return (
     <div className="space-y-8">
@@ -134,6 +137,24 @@ export default async function ComunicacionesPage({
             numerica: true,
             clase: 'text-xs whitespace-nowrap',
             celda: (comunicacion) => fechaCorta(comunicacion.fechaRecepcion),
+          },
+          {
+            clave: 'deteccion',
+            encabezado: 'Detección',
+            clase: 'whitespace-nowrap',
+            celda: (comunicacion) => (
+              <div className="flex items-center gap-2">
+                <BotonAnalizar comunicacionId={comunicacion.id} accion={accionAnalizar} />
+                {comunicacion._count.detecciones > 0 ? (
+                  <Link
+                    href={`/${orgSlug}/detecciones`}
+                    className="text-xs underline underline-offset-4"
+                  >
+                    {String(comunicacion._count.detecciones)}
+                  </Link>
+                ) : null}
+              </div>
+            ),
           },
         ]}
       />

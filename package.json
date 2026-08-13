@@ -51,6 +51,7 @@
     ]
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@auth/prisma-adapter": "2.11.3",
     "@hookform/resolvers": "5.7.1",
     "@node-rs/argon2": "2.0.2",

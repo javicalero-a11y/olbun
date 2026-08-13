@@ -4,6 +4,38 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M7 — Detección (2026-08-13)
+
+Cierra el bucle: entra un correo, se señala lo que importa con la frase que lo
+justifica, una persona lo confirma y el expediente se abre con su cronograma en
+marcha.
+
+- `Deteccion`: catorce tipos, con la confianza que dijo el motor y la que quedó
+  tras comprobar sus citas, guardadas por separado. RLS como en el resto.
+- **Toda cita se verifica en el servidor por coincidencia exacta contra el texto
+  original antes de guardarse.** La que no aparece se descarta y baja la
+  confianza; la detección que se queda sin ninguna no llega a la cola y se
+  registra como descartada, que es el material para revisar el prompt
+  ([ADR 0006](adr/0006-verified-quotes-instead-of-api-citations.md)).
+- Los desplazamientos de cada cita los calcula el servidor: al modelo no se le
+  piden, porque un resaltado que señala la frase equivocada es peor que ninguno.
+- Motor de Claude con salida estructurada (`claude-opus-5`), y motor de reglas
+  local para cuando no hay clave. Cada detección guarda cuál de los dos habló.
+- Cola de triaje ordenada por confianza × gravedad, con la cita resaltada en su
+  contexto, atajos de teclado y un cajón aparte para la baja confianza.
+- Confirmar abre el expediente desde su plantilla, con la fecha de cómputo que
+  decide la persona. Un plazo citado en un correo sigue sin crear ningún plazo.
+- Lo que una persona confirma o descarta no lo cambia un análisis posterior; un
+  descarte automático sí puede sustituirlo un motor mejor.
+- `MOTOR_DETECCION` fija el motor; la suite de extremo a extremo lo pone en
+  `reglas` para no depender de la red ni gastar dinero.
+
+## Portada de acceso (2026-08-13)
+
+- `/acceso` abre a pantalla completa con la marca y el logotipo centrados, y el
+  formulario aparece al bajar. Sin JavaScript o con movimiento reducido no hay
+  transición: las dos partes se ven y el formulario está a un scroll.
+
 ## Entrar con Google y con enlace por correo (2026-08-12)
 
 - Adaptador de Auth.js ajustado al modelo `User` que ya existía: traduce

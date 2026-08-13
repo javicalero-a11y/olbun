@@ -54,6 +54,21 @@ const serverSchema = z.object({
 
   /** From: address for magic links. Falls back to a no-reply on APP_URL's host. */
   AUTH_EMAIL_FROM: z.email().optional(),
+
+  /**
+   * Detection (M7). Optional on the same terms as the sign-in providers: with
+   * no key the local rule engine runs instead, so the product works on a
+   * laptop without one — weaker, and labelled as such on every detection it
+   * produces.
+   */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+
+  /**
+   * Forces one engine regardless of the key. `reglas` is what the end-to-end
+   * suite sets: a test run must not depend on a network call, and it must
+   * certainly not spend money because somebody added a key to their `.env`.
+   */
+  MOTOR_DETECCION: z.enum(['claude', 'reglas']).optional(),
 });
 
 const serverSchemaValidado = serverSchema.refine(

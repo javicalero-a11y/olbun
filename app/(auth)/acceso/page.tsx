@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { FormularioAcceso } from '@/components/features/auth/formulario-acceso';
 import { OtrosAccesos } from '@/components/features/auth/otros-accesos';
+import { PortadaAcceso } from '@/components/features/auth/portada-acceso';
 import { MENSAJE_RECHAZO, type MotivoRechazo } from '@/lib/auth/politica-acceso';
 import { estadoGoogle, estadoMicrosoft } from '@/lib/auth/proveedores';
 
@@ -21,34 +22,36 @@ export default async function AccesoPage({
     motivo && motivo in MENSAJE_RECHAZO ? MENSAJE_RECHAZO[motivo as MotivoRechazo] : null;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Entrar</h1>
-        <p className="text-sm text-muted-foreground">Accede a tu espacio de trabajo.</p>
-      </div>
+    <PortadaAcceso>
+      <div className="space-y-6">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Entrar</h1>
+          <p className="text-sm text-muted-foreground">Accede a tu espacio de trabajo.</p>
+        </div>
 
-      {rechazo ? (
-        <p
-          role="alert"
-          className="rounded-md border border-status-amber/30 bg-status-amber-subtle px-3 py-2.5 text-sm"
-        >
-          {rechazo}
+        {rechazo ? (
+          <p
+            role="alert"
+            className="rounded-md border border-status-amber/30 bg-status-amber-subtle px-3 py-2.5 text-sm"
+          >
+            {rechazo}
+          </p>
+        ) : null}
+
+        <FormularioAcceso />
+
+        <OtrosAccesos google={estadoGoogle()} microsoft={estadoMicrosoft()} />
+
+        <p className="text-sm text-muted-foreground">
+          ¿No tienes cuenta?{' '}
+          <Link
+            href="/registro"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Crear una
+          </Link>
         </p>
-      ) : null}
-
-      <FormularioAcceso />
-
-      <OtrosAccesos google={estadoGoogle()} microsoft={estadoMicrosoft()} />
-
-      <p className="text-sm text-muted-foreground">
-        ¿No tienes cuenta?{' '}
-        <Link
-          href="/registro"
-          className="font-medium text-foreground underline underline-offset-4"
-        >
-          Crear una
-        </Link>
-      </p>
-    </div>
+      </div>
+    </PortadaAcceso>
   );
 }

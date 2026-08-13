@@ -118,6 +118,7 @@ model Organisation {
   buzones              BuzonConectado[]
   comunicaciones       Comunicacion[]
   adjuntos             Adjunto[]
+  detecciones          Deteccion[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -846,7 +847,10 @@ model Expediente {
   plazos       Plazo[]
   actuaciones  Actuacion[]
 
-  comunicaciones Comunicacion[]
+  comunicaciones    Comunicacion[]
+  /// The detections that led here. SPEC calls this `origenDeteccionId`; it
+  /// lives on `Deteccion` so the link is a relation (ADR 0004).
+  origenDetecciones Deteccion[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado])
@@ -1116,6 +1120,7 @@ model Comunicacion {
   contrato     Contrato?      @relation(fields: [contratoId], references: [id], onDelete: SetNull)
   expediente   Expediente?    @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
   adjuntos     Adjunto[]
+  detecciones  Deteccion[]
 
   @@unique([organisationId, messageIdRFC])
   @@unique([organisationId, huella])
@@ -1161,4 +1166,101 @@ model Adjunto {
 
   @@index([organisationId, comunicacionId])
   @@map("adjuntos")
+}
+
+/// What a detection claims to have found (SPEC §4.4).
+///
+/// The catalogue is closed on purpose: a detection whose type nobody has
+/// decided what to do with is a notification, not a signal.
+enum TipoDeteccion {
+  REQUERIMIENTO_FORMAL
+  PREAVISO_PENALIDAD
+  INCUMPLIMIENTO_ALEGADO
+  RECLAMACION_USUARIO
+  QUEJA_FORMAL
+  IMPAGO_FACTURA
+  SOLICITUD_MODIFICADO
+  AMENAZA_RESOLUCION
+  INICIO_EXPEDIENTE_SANCIONADOR
+  ASUNTO_LABORAL
+  SUBROGACION
+  SINIESTRO
+  PLAZO_MENCIONADO
+  RIESGO_PRL
+}
+
+enum EstadoDeteccion {
+  NUEVA
+  CONFIRMADA
+  DESCARTADA
+  CONVERTIDA
+}
+
+/// A proposal about one message, awaiting a person (SPEC §4.4, §6.4).
+///
+/// Nothing here acts on its own. A detection is a claim plus the literal words
+/// that justify it, and those words are verified against the source text by
+/// exact substring match before this row is written — see
+/// `lib/domain/detecciones/verificacion.ts` and ADR 0006.
+///
+/// `confianzaModelo` is kept alongside `confianza` because they answer
+/// different questions: what the engine claimed, and what survived
+/// verification. A widening gap between them is how you notice a prompt
+/// starting to invent quotes.
+///
+/// `modelId` and `promptVersion` are not decoration. When a reviewer says the
+/// queue got worse last week, these are what makes that answerable.
+model Deteccion {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  /// The message this was found in. `notificacionId` joins it when electronic
+  /// notifications arrive (SPEC §4.3) — a notification is what starts a legal
+  /// clock, so it will carry detections of its own.
+  comunicacionId String
+
+  tipo            TipoDeteccion
+  /// 0–1, after verification penalties. This is the number the queue sorts on.
+  confianza       Float
+  /// 0–1, as claimed by the engine before any quote was checked.
+  confianzaModelo Float
+
+  /// Array of `{texto, inicioChar, finChar}` — quotes verified against the
+  /// source. Offsets are the server's own, never the engine's.
+  extractos            Json
+  /// How many proposed quotes did not appear in the source and were dropped.
+  extractosDescartados Int  @default(0)
+
+  /// Typed by `tipo`: amounts, dates, articles cited, deadline mentioned.
+  datosExtraidos Json?
+
+  estado         EstadoDeteccion @default(NUEVA)
+  revisadaPorId  String?
+  revisadaEn     DateTime?
+  /// Free text on discard. Feeds prompt tuning, so it is worth asking for.
+  motivoDescarte String?
+
+  /// Set when confirming this detection opened an expediente. The inverse of
+  /// SPEC's `Expediente.origenDeteccionId`, kept on this side so the link is a
+  /// relation rather than a loose id (ADR 0004).
+  expedienteId String?
+
+  modelId       String
+  promptVersion String
+  costeTokens   Int?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  comunicacion Comunicacion @relation(fields: [comunicacionId], references: [id], onDelete: Cascade)
+  expediente   Expediente?  @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+
+  /// One finding of each kind per message. Re-analysing a message must refresh
+  /// what is still pending, not pile a second copy on top of it — and must
+  /// never resurrect something a person already discarded.
+  @@unique([organisationId, comunicacionId, tipo])
+  @@index([organisationId, estado, confianza])
+  @@map("detecciones")
 }

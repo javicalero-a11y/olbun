@@ -41,5 +41,11 @@ export default defineConfig({
     timeout: 180_000,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      // Detection runs on the local rule engine here, always. A suite that
+      // reached the Claude API would be slow, non-deterministic, and would
+      // start costing money the day somebody put a key in their `.env`.
+      MOTOR_DETECCION: 'reglas',
+    },
   },
 });
