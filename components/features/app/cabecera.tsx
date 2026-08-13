@@ -16,7 +16,7 @@ interface CabeceraProps {
 }
 
 /** Modules that exist. Permission-gated pages 403 on their own if entered. */
-const SECCIONES = [
+export const SECCIONES = [
   { titulo: 'Contratos', ruta: 'contratos' },
   { titulo: 'Expedientes', ruta: 'expedientes' },
   { titulo: 'Plazos', ruta: 'plazos' },
@@ -27,79 +27,92 @@ const SECCIONES = [
   { titulo: 'Documentos', ruta: 'documentos' },
 ];
 
+/**
+ * The contents of the top bar.
+ *
+ * The search box goes to the document search, which reads names, descriptions
+ * and extracted contents. It is pointed at something real on purpose: a search
+ * field that looks global and only half-works teaches people not to trust the
+ * results, which is worse than not offering one.
+ */
 export function CabeceraApp({ organisation, organisations, user, rol, tema }: CabeceraProps) {
   const otras = organisations.filter((o) => o.slug !== organisation.slug);
 
   return (
-    <header className="border-b border-border bg-card/40">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Link href={`/${organisation.slug}`} aria-label="Olbun, inicio">
-            <Logotipo />
-          </Link>
-          <span className="text-border" aria-hidden="true">
-            /
-          </span>
-          <span className="text-sm font-medium">{organisation.name}</span>
+    <>
+      <Link href={`/${organisation.slug}`} aria-label="Olbun, inicio" className="shrink-0">
+        <Logotipo />
+      </Link>
 
-          {/* Wraps rather than hiding on narrow screens: a phone with no way to
-              reach Plazos is a phone that cannot tell you what expires today. */}
-          <nav
-            aria-label="Secciones"
-            className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 sm:ml-4 sm:w-auto"
+      <form
+        action={`/${organisation.slug}/documentos`}
+        role="search"
+        className="relative mx-2 hidden min-w-0 flex-1 sm:block"
+      >
+        <label htmlFor="busqueda-global" className="sr-only">
+          Buscar en los documentos de {organisation.name}
+        </label>
+        <input
+          id="busqueda-global"
+          name="q"
+          type="search"
+          placeholder="Buscar un documento por su nombre o por lo que dice"
+          className="w-full rounded-full border border-input bg-background py-2 pr-10 pl-4 text-sm"
+        />
+        <button
+          type="submit"
+          aria-label="Buscar"
+          className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            className="h-4 w-4"
           >
-            {SECCIONES.map((seccion) => (
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+          </svg>
+        </button>
+      </form>
+
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {otras.length > 0 ? (
+          <nav
+            aria-label="Cambiar de organización"
+            className="hidden items-center gap-2 md:flex"
+          >
+            <span className="text-xs text-muted-foreground">Cambiar a:</span>
+            {otras.map((o) => (
               <Link
-                key={seccion.ruta}
-                href={`/${organisation.slug}/${seccion.ruta}`}
-                className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                key={o.slug}
+                href={`/${o.slug}`}
+                className="text-xs underline underline-offset-4"
               >
-                {seccion.titulo}
+                {o.name}
               </Link>
             ))}
           </nav>
+        ) : null}
+
+        <CambiarTema tema={tema} />
+
+        <div className="hidden text-right sm:block">
+          <p className="text-sm leading-tight font-medium">{user.name}</p>
+          <p className="text-xs leading-tight text-muted-foreground">{ETIQUETA_ROL[rol]}</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          {otras.length > 0 ? (
-            <nav aria-label="Cambiar de organización" className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Cambiar a:</span>
-              {otras.map((o) => (
-                <Link
-                  key={o.slug}
-                  href={`/${o.slug}`}
-                  className="text-xs underline underline-offset-4"
-                >
-                  {o.name}
-                </Link>
-              ))}
-            </nav>
-          ) : null}
-
-          <CambiarTema tema={tema} />
-
-          <Link
-            href={`/${organisation.slug}/ajustes`}
+        <form action={cerrarSesion}>
+          <button
+            type="submit"
             className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
-            Ajustes
-          </Link>
-
-          <div className="text-right">
-            <p className="text-sm leading-tight font-medium">{user.name}</p>
-            <p className="text-xs leading-tight text-muted-foreground">{ETIQUETA_ROL[rol]}</p>
-          </div>
-
-          <form action={cerrarSesion}>
-            <button
-              type="submit"
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              Salir
-            </button>
-          </form>
-        </div>
+            Salir
+          </button>
+        </form>
       </div>
-    </header>
+    </>
   );
 }

@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
+import { CabeceraApp, SECCIONES } from '@/components/features/app/cabecera';
 import { COOKIE_TEMA, leerTema } from '@/lib/tema';
 import { getSessionContext } from '@/lib/auth/session';
-import { CabeceraApp } from '@/components/features/app/cabecera';
+import { MarcoApp } from '@/components/features/app/barra-lateral';
 
 /**
  * The authenticated, organisation-scoped shell.
@@ -27,15 +28,20 @@ export default async function OrgLayout({
   const tema = leerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <CabeceraApp
-        organisation={contexto.organisation}
-        organisations={contexto.organisations}
-        user={contexto.user}
-        rol={contexto.actor.role}
-        tema={tema}
-      />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">{children}</main>
-    </div>
+    <MarcoApp
+      orgSlug={orgSlug}
+      secciones={SECCIONES}
+      barra={
+        <CabeceraApp
+          organisation={contexto.organisation}
+          organisations={contexto.organisations}
+          user={contexto.user}
+          rol={contexto.actor.role}
+          tema={tema}
+        />
+      }
+    >
+      {children}
+    </MarcoApp>
   );
 }

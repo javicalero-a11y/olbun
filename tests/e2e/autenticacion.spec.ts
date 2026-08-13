@@ -32,8 +32,10 @@ test.describe('Registro y acceso', () => {
 
     // El slug pierde acentos y forma jurídica: "Jardinería Peñalba x, S.L."
     await expect(page).toHaveURL(new RegExp(`/jardineria-penalba-${cred.sufijo}$`));
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Ana');
-    await expect(page.getByRole('main').getByText(cred.empresa)).toBeVisible();
+    // El encabezado es la organización, que es de quien va el panel; el
+    // saludo a la persona va debajo.
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(cred.empresa);
+    await expect(page.getByRole('main').getByText('Hola, Ana')).toBeVisible();
   });
 
   test('el propietario ve todas las áreas de la matriz de permisos', async ({ page }) => {
