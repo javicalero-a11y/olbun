@@ -6,11 +6,11 @@
  * that silently misses half the documents is worse than one that tells you
  * which ones it could not read.
  *
- * PDFs, Word files and scans are **not** handled here. They need a parser and,
- * for scans, OCR — and pretending to extract from them by pulling the ASCII
- * runs out of a binary produces exactly the kind of plausible-looking rubbish
- * that makes a search result untrustworthy. Those files are recorded as
- * unextracted, which the screen shows.
+ * PDFs are handled by `lib/services/extraccion`, which needs a parser and is
+ * therefore async; Word files and scans are handled by nobody yet. Pretending
+ * to extract from them by pulling the ASCII runs out of a binary would produce
+ * exactly the kind of plausible-looking rubbish that makes a search result
+ * untrustworthy, so they are recorded as unextracted and the screen says so.
  */
 
 export type ResultadoExtraccion =
@@ -42,7 +42,8 @@ const EXTENSIONES_DE_TEXTO = [
 ];
 
 const MOTIVOS: Readonly<Record<string, string>> = {
-  'application/pdf': 'Los PDF necesitan un extractor propio; llega con el resto de M9.',
+  'application/pdf':
+    'Este PDF no se ha podido leer aquí; lo intenta el extractor del servicio.',
   'application/msword': 'Los .doc necesitan un extractor propio.',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     'Los .docx necesitan un extractor propio.',
@@ -72,7 +73,7 @@ function pareceBinario(contenido: Buffer): boolean {
 }
 
 /** Long documents are truncated: the tail of a 40 MB log is not evidence. */
-const MAXIMO_CARACTERES = 200_000;
+export const MAXIMO_CARACTERES = 200_000;
 
 export function extraerTexto(
   contenido: Buffer,

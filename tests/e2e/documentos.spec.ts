@@ -226,9 +226,9 @@ test.describe('Búsqueda', () => {
     await page.getByRole('main').getByRole('button', { name: 'Buscar' }).click();
 
     await expect(page.getByText('Nada coincide con esa búsqueda')).toBeVisible();
-    // Y avisa de que los PDF aún no se indexan, que es la razón más probable
-    // de que algo que existe no aparezca.
-    await expect(page.getByText(/PDF y los escaneados todavía no se indexan/)).toBeVisible();
+    // Y avisa de que un escaneado sin OCR no tiene texto que indexar, que es
+    // la razón más probable de que algo que existe no aparezca.
+    await expect(page.getByText(/escaneados sin OCR/)).toBeVisible();
   });
 });
 

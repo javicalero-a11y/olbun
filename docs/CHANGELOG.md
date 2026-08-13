@@ -36,8 +36,11 @@ SPEC §12.
   el índice en vez de desaparecer sin más.
 - Exportar exige `expediente:export`, no `expediente:view`: leer un expediente
   en pantalla y llevarse el archivo entero son cosas distintas.
-- Queda para la siguiente tanda: antivirus, extracción de PDF y escaneados,
-  purga por retención e índice en PDF.
+- Extracción de PDF con pdf.js, que es el motor que aguanta los PDF malformados
+  que mandan de verdad las administraciones. Un PDF sin texto se marca como
+  escaneado que necesita OCR, no como indexado y vacío.
+- Queda para la siguiente tanda: antivirus, OCR de escaneados, ficheros de
+  Word, purga por retención e índice en PDF.
 
 ## M10 — Riesgos e incidencias (2026-08-13)
 

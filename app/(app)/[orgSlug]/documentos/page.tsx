@@ -175,7 +175,7 @@ export default async function DocumentosPage({
           consulta ? (
             <EstadoVacio
               titulo="Nada coincide con esa búsqueda"
-              explicacion="Se busca en el nombre, la descripción y el texto de los documentos que se han podido leer. Los PDF y los escaneados todavía no se indexan, así que puede estar ahí sin aparecer."
+              explicacion="Se busca en el nombre, la descripción y el texto de los documentos que se han podido leer, PDF incluidos. Los escaneados sin OCR no tienen texto que indexar, así que pueden estar ahí sin aparecer."
             />
           ) : (
             <EstadoVacio

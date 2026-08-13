@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { extraerTexto } from '@/lib/domain/documentos/texto';
+import { extraerTextoDeArchivo } from '@/lib/services/extraccion';
 import { guardarObjeto, leerObjeto } from '@/lib/storage/objetos';
 import type { Prisma } from '@prisma/client';
 import type { TenantTransactionClient } from '@/lib/db/tenant';
@@ -169,7 +169,7 @@ export async function subirDocumento(
       select: { id: true },
     }));
 
-  const extraido = extraerTexto(datos.contenido, datos.mimeType, datos.nombre);
+  const extraido = await extraerTextoDeArchivo(datos.contenido, datos.mimeType, datos.nombre);
 
   // Numbered from the highest existing rather than from a count, so a purged
   // version cannot make two versions share a number.
