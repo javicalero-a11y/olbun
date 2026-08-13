@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
@@ -124,13 +125,21 @@ export default async function DocumentosPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Documentos</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Pliegos, actas, resoluciones y todo lo que hay que poder enseñar. Cada subida es una
-          versión nueva: lo anterior se conserva, porque la pregunta suele ser qué decía en
-          marzo.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Documentos</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Pliegos, actas, resoluciones y todo lo que hay que poder enseñar. Cada subida es una
+            versión nueva: lo anterior se conserva, porque la pregunta suele ser qué decía en
+            marzo.
+          </p>
+        </div>
+        <Link
+          href={`/${orgSlug}/documentos/retencion`}
+          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          Conservación
+        </Link>
       </div>
 
       <form role="search" className="flex gap-2">

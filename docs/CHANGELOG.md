@@ -44,8 +44,27 @@ SPEC §12.
   El `.doc` antiguo es otro formato y se sigue marcando como no indexado, porque
   leerlo a medias metería en el índice trozos que parecen el documento y no lo
   son.
-- Queda para la siguiente tanda: antivirus, OCR de escaneados, purga por
-  retención e índice en PDF.
+- **Conservación y purga.** Dos obligaciones que tiran en sentidos contrarios:
+  la contratación pública dice que se guarde el expediente, el RGPD dice que no
+  se guarden datos personales más de lo necesario. El plazo cuenta desde el fin
+  del contrato cuando lo hay y, si no, desde la fecha del documento: un
+  contrato cerrado en 2019 cuyo pliego se escaneó en 2024 no gana cinco años
+  por cuándo se escaneó.
+- Nada se purga solo. No hay trabajo nocturno que borre pruebas mientras nadie
+  mira: la pantalla enseña lo que ha cumplido plazo y una persona con
+  `documento:delete` escribe PURGAR para confirmar. Queda en la auditoría quién
+  fue y cuándo, sin nada del contenido.
+- El bloqueo por litigio gana a cualquier plazo cumplido, y esos documentos ni
+  siquiera aparecen en la lista. Se avisa con noventa días de antelación para
+  que una purga no sea nunca una sorpresa.
+- Sin política no es lo mismo que para siempre: un tipo documental sin plazo se
+  cuenta aparte para que alguien lo decida, en vez de caer en una lista de
+  borrado porque el nulo ordenó como cero.
+- Las filas se borran en blando y los ficheros en duro, y sólo los ficheros que
+  no comparte nadie. Como el almacén direcciona por contenido, borrar el objeto
+  de una versión caducada habría vaciado el documento idéntico de otro
+  expediente.
+- Queda para la siguiente tanda: antivirus, OCR de escaneados e índice en PDF.
 
 ## M10 — Riesgos e incidencias (2026-08-13)
 

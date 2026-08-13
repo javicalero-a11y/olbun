@@ -255,3 +255,49 @@ test.describe('Exportar el expediente', () => {
     expect(archivo.suggestedFilename()).toMatch(/^EXP-\d{4}-\d{4}\.zip$/);
   });
 });
+
+test.describe('Conservación y purga', () => {
+  test('lo que se acaba de subir no se puede purgar, y la pantalla dice por qué', async ({
+    page,
+  }) => {
+    // La propiedad que importa no es que la purga funcione, es que no funcione
+    // cuando no debe. Un documento de hoy con seis años de conservación no
+    // puede aparecer en ninguna lista de borrado.
+    const cred = await registrar(page);
+
+    await page.goto(`/${cred.slug}/documentos`);
+    await subir(
+      page,
+      'contrato-formalizado.txt',
+      'Contrato formalizado.',
+      'Contrato formalizado',
+    );
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.getByRole('link', { name: 'Conservación' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Conservación y purga');
+
+    await expect(page.getByText('Nada ha cumplido plazo')).toBeVisible();
+    await expect(page.getByText('Ninguno caduca pronto')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Purgar…' })).toHaveCount(0);
+  });
+
+  test('un documento sin tipo se cuenta como sin política, no como conservable para siempre', async ({
+    page,
+  }) => {
+    const cred = await registrar(page);
+
+    await page.goto(`/${cred.slug}/documentos`);
+    await subir(page, 'nota-suelta.txt', 'Una nota sin clasificar.');
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.goto(`/${cred.slug}/documentos/retencion`);
+
+    // El recuadro entero, para leer el número que acompaña al término.
+    const sinPolitica = page
+      .locator('div', { has: page.getByText('Sin política', { exact: true }) })
+      .last();
+    await expect(sinPolitica).toContainText('Sin política');
+    await expect(sinPolitica.locator('dd')).toHaveText('1');
+  });
+});

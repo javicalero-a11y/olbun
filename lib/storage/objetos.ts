@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -180,4 +181,26 @@ export async function leerObjeto(clave: string, sha256Esperado: string): Promise
   }
 
   return contenido;
+}
+
+/**
+ * Removes an object's bytes. Used only by the retention purge.
+ *
+ * **Content addressing makes this dangerous if called carelessly.** Two
+ * versions with identical bytes share one key, so deleting an object because
+ * one version expired would silently empty the other. The caller must have
+ * established that no live version still points here — `lib/services/retencion`
+ * is the only place that does, and the only place that should call this.
+ *
+ * A missing object is not an error: the purge is idempotent, and a half-run
+ * purge must be safe to run again.
+ */
+export async function borrarObjeto(clave: string): Promise<void> {
+  try {
+    await cliente().send(
+      new DeleteObjectCommand({ Bucket: serverEnv().S3_BUCKET, Key: clave }),
+    );
+  } catch (error) {
+    logger.warn({ clave, error }, 'No se pudo borrar un objeto ya purgado en la base de datos');
+  }
 }
