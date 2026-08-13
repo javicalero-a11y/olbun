@@ -18,8 +18,8 @@ pnpm db:up && pnpm db:deploy && pnpm db:seed
 pnpm dev
 ```
 
-The app runs at <http://localhost:3000>; `GET /api/health` reports dependency
-status.
+The app runs at <http://localhost:3100>; `GET /api/health` reports dependency
+status. Port 3100 keeps Olbun clear of other local Next.js projects on 3000.
 
 ## Documentation
 

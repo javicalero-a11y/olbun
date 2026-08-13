@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
+import { fragmentoAlrededor } from '@/lib/domain/documentos/texto';
 import { FormularioSubidaDocumento } from '@/components/features/documentos/formulario-subida';
 import { requirePermission } from '@/lib/auth/guardias';
 import { subir } from './acciones';
@@ -37,16 +38,43 @@ function fechaCorta(valor: Date): string {
  */
 export default async function DocumentosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { orgSlug } = await params;
+  const { q } = await searchParams;
+  const consulta = q?.trim() ?? '';
   const contexto = await requirePermission(orgSlug, 'documento:view');
   const db = tenantClient(contexto.organisation.id);
 
   const [documentos, tipos, expedientes] = await Promise.all([
     db.documento.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        // Searches the name, the description and the extracted text at once:
+        // people look for a document by what it is called *or* by a phrase
+        // they remember from inside it, and asking which is unreasonable.
+        // `insensitive` covers case; accents are handled by the domain helper
+        // when highlighting, and Postgres's es-ES collation does the rest.
+        ...(consulta
+          ? {
+              OR: [
+                { nombre: { contains: consulta, mode: 'insensitive' as const } },
+                { descripcion: { contains: consulta, mode: 'insensitive' as const } },
+                {
+                  versiones: {
+                    some: {
+                      deletedAt: null,
+                      textoExtraido: { contains: consulta, mode: 'insensitive' as const },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
       select: {
         id: true,
         nombre: true,
@@ -62,6 +90,7 @@ export default async function DocumentosPage({
             tamano: true,
             estadoAnalisis: true,
             createdAt: true,
+            textoExtraido: true,
           },
           orderBy: { numero: 'desc' },
         },
@@ -83,7 +112,14 @@ export default async function DocumentosPage({
   ]);
 
   const filas = documentos
-    .map((documento) => ({ ...documento, actual: documento.versiones[0] }))
+    .map((documento) => ({
+      ...documento,
+      actual: documento.versiones[0],
+      // The line of the document the search matched, if it matched inside one.
+      fragmento: consulta
+        ? fragmentoAlrededor(documento.versiones[0]?.textoExtraido ?? '', consulta)
+        : null,
+    }))
     .filter((documento) => documento.actual !== undefined);
 
   return (
@@ -96,6 +132,26 @@ export default async function DocumentosPage({
           marzo.
         </p>
       </div>
+
+      <form role="search" className="flex gap-2">
+        <label htmlFor="q" className="sr-only">
+          Buscar en los documentos
+        </label>
+        <input
+          id="q"
+          name="q"
+          type="search"
+          defaultValue={consulta}
+          placeholder="Buscar por nombre o por lo que dice dentro"
+          className="w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-input px-3 py-2 text-sm font-medium"
+        >
+          Buscar
+        </button>
+      </form>
 
       <FormularioSubidaDocumento
         accion={subir.bind(null, orgSlug)}
@@ -116,10 +172,17 @@ export default async function DocumentosPage({
         filas={filas}
         claveDeFila={(documento) => documento.id}
         vacio={
-          <EstadoVacio
-            titulo="Todavía no hay documentos"
-            explicacion="Aquí van los pliegos, las actas de inicio, los requerimientos y las resoluciones. Guardarlos con su versión y su fecha es lo que permite responder a una inspección sin buscar en el correo de nadie."
-          />
+          consulta ? (
+            <EstadoVacio
+              titulo="Nada coincide con esa búsqueda"
+              explicacion="Se busca en el nombre, la descripción y el texto de los documentos que se han podido leer. Los PDF y los escaneados todavía no se indexan, así que puede estar ahí sin aparecer."
+            />
+          ) : (
+            <EstadoVacio
+              titulo="Todavía no hay documentos"
+              explicacion="Aquí van los pliegos, las actas de inicio, los requerimientos y las resoluciones. Guardarlos con su versión y su fecha es lo que permite responder a una inspección sin buscar en el correo de nadie."
+            />
+          )
         }
         columnas={[
           {
@@ -137,7 +200,13 @@ export default async function DocumentosPage({
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {documento.tipo?.nombre ?? 'Sin clasificar'}
                   {documento.descripcion ? ` · ${documento.descripcion}` : ''}
+                  {documento.actual?.textoExtraido === null ? ' · Sin indexar' : ''}
                 </p>
+                {documento.fragmento ? (
+                  <p className="mt-1 border-l-2 border-border pl-2 text-xs text-muted-foreground italic">
+                    {documento.fragmento}
+                  </p>
+                ) : null}
               </>
             ),
           },

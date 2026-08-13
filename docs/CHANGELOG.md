@@ -20,7 +20,13 @@ SPEC §12.
 - Catálogo de tipos documentales sembrado en español, con los años de
   conservación de cada uno. Un documento sin clasificar dice «sin política» en
   vez de aparentar que tiene una.
-- Queda para la siguiente tanda: antivirus, extracción de texto, búsqueda,
+- Extracción de texto al subir y búsqueda por nombre, descripción y contenido,
+  con el fragmento donde coincide. Sin tildes y sin mayúsculas: nadie escribe
+  «Alcalá» con tilde en un buscador.
+- Lo que no se puede leer se marca «sin indexar» y se dice en la búsqueda
+  vacía. Sacar las tiras ASCII de un PDF produce basura verosímil, que es justo
+  lo que hace que un resultado deje de ser fiable.
+- Queda para la siguiente tanda: antivirus, extracción de PDF y escaneados,
   purga por retención y exportación del expediente en zip.
 
 ## M10 — Riesgos e incidencias (2026-08-13)

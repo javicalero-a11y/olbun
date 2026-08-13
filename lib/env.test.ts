@@ -15,7 +15,7 @@ describe('parseServerEnv', () => {
     const env = parseServerEnv(valid);
 
     expect(env.DATABASE_URL).toBe(valid.DATABASE_URL);
-    expect(env.APP_URL).toBe('http://localhost:3000');
+    expect(env.APP_URL).toBe('http://localhost:3100');
     expect(env.LOG_LEVEL).toBe('info');
   });
 

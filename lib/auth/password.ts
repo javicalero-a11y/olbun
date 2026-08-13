@@ -64,7 +64,10 @@ export async function isPasswordBreached(
   try {
     const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
       headers: { 'Add-Padding': 'true' },
-      signal: signal ?? AbortSignal.timeout(2500),
+      // The check is advisory and must never block sign-up on a slow or broken
+      // outbound connection. A short timeout keeps the UX responsive while still
+      // surfacing the common breached-password case when the service is healthy.
+      signal: signal ?? AbortSignal.timeout(750),
     });
 
     if (!response.ok) return false;

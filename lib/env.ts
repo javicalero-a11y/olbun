@@ -29,7 +29,7 @@ const serverSchema = z.object({
   ENCRYPTION_KEY: z.string().min(44, 'ENCRYPTION_KEY must be 32 bytes encoded as base64'),
 
   /** Canonical origin of the app, used for links in emails and redirects. */
-  APP_URL: z.url().default('http://localhost:3000'),
+  APP_URL: z.url().default('http://localhost:3100'),
 
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 

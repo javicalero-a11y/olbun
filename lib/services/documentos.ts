@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { extraerTexto } from '@/lib/domain/documentos/texto';
 import { guardarObjeto, leerObjeto } from '@/lib/storage/objetos';
 import type { Prisma } from '@prisma/client';
 import type { TenantTransactionClient } from '@/lib/db/tenant';
@@ -119,6 +120,8 @@ export interface SubirResultado {
   numero: number;
   /** True when these exact bytes were already in the store. */
   contenidoRepetido: boolean;
+  /** False when the file could not be read for the search index. */
+  indexado: boolean;
 }
 
 /**
@@ -166,6 +169,8 @@ export async function subirDocumento(
       select: { id: true },
     }));
 
+  const extraido = extraerTexto(datos.contenido, datos.mimeType, datos.nombre);
+
   // Numbered from the highest existing rather than from a count, so a purged
   // version cannot make two versions share a number.
   const ultima = await db.versionDocumento.findFirst({
@@ -190,6 +195,11 @@ export async function subirDocumento(
       // scanner arrives later in this milestone; until then the download
       // screen shows the file as unscanned rather than implying it is clean.
       estadoAnalisis: 'PENDIENTE',
+      // Extracted inline: these are small files, and a queue for work that
+      // takes milliseconds would be infrastructure bought for nothing. Null
+      // means "could not read it", which is what the screen shows — as
+      // distinct from an empty string, which means the file had no text.
+      textoExtraido: extraido.estado === 'EXTRAIDO' ? extraido.texto : null,
       createdById: datos.creadoPorId,
     },
     select: { id: true },
@@ -200,6 +210,7 @@ export async function subirDocumento(
     versionId: version.id,
     numero,
     contenidoRepetido: objeto.yaExistia,
+    indexado: extraido.estado === 'EXTRAIDO',
   };
 }
 

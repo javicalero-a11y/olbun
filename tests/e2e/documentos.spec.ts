@@ -193,3 +193,41 @@ test.describe('Versiones', () => {
     await expect(page.getByRole('status')).toContainText('idéntico');
   });
 });
+
+test.describe('Búsqueda', () => {
+  test('encuentra un documento por lo que dice dentro', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+
+    await subir(
+      page,
+      'requerimiento.txt',
+      'Se requiere subsanar la falta de personal en el turno de noche.',
+    );
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.getByLabel('Buscar en los documentos').fill('turno de noche');
+    await page.getByRole('button', { name: 'Buscar' }).click();
+
+    const fila = page.getByRole('row').filter({ hasText: 'requerimiento.txt' });
+    await expect(fila).toBeVisible();
+    // Y enseña la frase que ha coincidido, no sólo el nombre del fichero.
+    await expect(fila).toContainText('turno de noche');
+  });
+
+  test('dice que no hay nada en vez de enseñar la lista entera', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+
+    await subir(page, 'acta.txt', 'Acta de inicio.');
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.getByLabel('Buscar en los documentos').fill('subrogación');
+    await page.getByRole('button', { name: 'Buscar' }).click();
+
+    await expect(page.getByText('Nada coincide con esa búsqueda')).toBeVisible();
+    // Y avisa de que los PDF aún no se indexan, que es la razón más probable
+    // de que algo que existe no aparezca.
+    await expect(page.getByText(/PDF y los escaneados todavía no se indexan/)).toBeVisible();
+  });
+});
