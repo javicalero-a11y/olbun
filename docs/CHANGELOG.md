@@ -26,8 +26,18 @@ SPEC §12.
 - Lo que no se puede leer se marca «sin indexar» y se dice en la búsqueda
   vacía. Sacar las tiras ASCII de un PDF produce basura verosímil, que es justo
   lo que hace que un resultado deje de ser fiable.
+- **Expediente completo en zip**: índice, cronología con hitos, plazos y
+  actuaciones, y todos los documentos en carpetas por fecha y versión. Para
+  entregar a un despacho o a una inspección.
+- El índice y la cronología van en Markdown, legibles dentro de diez años sin
+  esta aplicación. Cada plazo dice si lo ha confirmado una persona o sólo lo ha
+  calculado el sistema.
+- Cada documento se verifica al meterlo en el zip; el que no cuadra se anota en
+  el índice en vez de desaparecer sin más.
+- Exportar exige `expediente:export`, no `expediente:view`: leer un expediente
+  en pantalla y llevarse el archivo entero son cosas distintas.
 - Queda para la siguiente tanda: antivirus, extracción de PDF y escaneados,
-  purga por retención y exportación del expediente en zip.
+  purga por retención e índice en PDF.
 
 ## M10 — Riesgos e incidencias (2026-08-13)
 

@@ -60,6 +60,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "mailparser": "^3.9.15",
     "next": "15.5.23",

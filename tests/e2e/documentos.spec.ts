@@ -206,8 +206,8 @@ test.describe('Búsqueda', () => {
     );
     await expect(page.getByRole('status')).toBeVisible();
 
-    await page.getByLabel('Buscar en los documentos').fill('turno de noche');
-    await page.getByRole('button', { name: 'Buscar' }).click();
+    await page.getByRole('main').getByLabel('Buscar en los documentos').fill('turno de noche');
+    await page.getByRole('main').getByRole('button', { name: 'Buscar' }).click();
 
     const fila = page.getByRole('row').filter({ hasText: 'requerimiento.txt' });
     await expect(fila).toBeVisible();
@@ -222,12 +222,36 @@ test.describe('Búsqueda', () => {
     await subir(page, 'acta.txt', 'Acta de inicio.');
     await expect(page.getByRole('status')).toBeVisible();
 
-    await page.getByLabel('Buscar en los documentos').fill('subrogación');
-    await page.getByRole('button', { name: 'Buscar' }).click();
+    await page.getByRole('main').getByLabel('Buscar en los documentos').fill('subrogación');
+    await page.getByRole('main').getByRole('button', { name: 'Buscar' }).click();
 
     await expect(page.getByText('Nada coincide con esa búsqueda')).toBeVisible();
     // Y avisa de que los PDF aún no se indexan, que es la razón más probable
     // de que algo que existe no aparezca.
     await expect(page.getByText(/PDF y los escaneados todavía no se indexan/)).toBeVisible();
+  });
+});
+
+test.describe('Exportar el expediente', () => {
+  test('se lleva el expediente entero en un zip, con índice y cronología', async ({ page }) => {
+    const cred = await registrar(page);
+
+    // Un expediente con su plantilla, que trae hitos y plazos.
+    await page.goto(`/${cred.slug}/expedientes/nuevo`);
+    // Elegir la plantilla rellena el tipo y la vía, y trae los hitos y plazos.
+    await page.getByLabel('Plantilla').selectOption({ label: 'Penalidad contractual' });
+    await page.getByLabel('Título').fill('Penalidad por retrasos en la recogida');
+    await page.getByLabel('Fecha de apertura').fill('2026-03-02');
+    await page.getByRole('button', { name: /Abrir expediente/ }).click();
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Penalidad por retrasos',
+    );
+
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Descargar expediente' }).click();
+    const archivo = await descarga;
+
+    expect(archivo.suggestedFilename()).toMatch(/^EXP-\d{4}-\d{4}\.zip$/);
   });
 });

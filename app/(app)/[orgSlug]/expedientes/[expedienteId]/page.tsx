@@ -127,9 +127,20 @@ export default async function ExpedientePage({
             </p>
           </div>
 
-          <span className={`text-sm font-medium ${estado?.clase ?? ''}`}>
-            {estado?.texto ?? expediente.estado}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className={`text-sm font-medium ${estado?.clase ?? ''}`}>
+              {estado?.texto ?? expediente.estado}
+            </span>
+
+            {/* The whole file in one zip, for external counsel or an
+                inspection. Gated on expediente:export, and audited. */}
+            <a
+              href={`/api/expedientes/${expediente.id}/zip?org=${orgSlug}`}
+              className="rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            >
+              Descargar expediente
+            </a>
+          </div>
         </div>
       </div>
 

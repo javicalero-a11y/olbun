@@ -50,7 +50,7 @@ export function CabeceraApp({ organisation, organisations, user, rol, tema }: Ca
         className="relative mx-2 hidden min-w-0 flex-1 sm:block"
       >
         <label htmlFor="busqueda-global" className="sr-only">
-          Buscar en los documentos de {organisation.name}
+          Búsqueda rápida de documentos en {organisation.name}
         </label>
         <input
           id="busqueda-global"
