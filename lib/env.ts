@@ -54,6 +54,18 @@ const serverSchema = z.object({
 
   /** From: address for magic links. Falls back to a no-reply on APP_URL's host. */
   AUTH_EMAIL_FROM: z.email().optional(),
+  MAIL_TRANSPORT: z.enum(['console', 'smtp']).optional(),
+  SMTP_URL: z.string().min(1).optional(),
+
+  /** Domain displayed for contract-specific forwarding aliases (M6). */
+  INBOUND_EMAIL_DOMAIN: z.string().min(3).default('entrada.olbun.local'),
+
+  /**
+   * Shared secret used by the inbound mail provider when it posts the raw
+   * RFC 822 message. Optional locally; the webhook refuses every request while
+   * it is absent, so a deployment can never expose an unauthenticated inlet.
+   */
+  INBOUND_EMAIL_SECRET: z.string().min(32).optional(),
 
   /**
    * Detection (M7). Optional on the same terms as the sign-in providers: with
@@ -83,13 +95,15 @@ const serverSchema = z.object({
   S3_SECRET_KEY: z.string().min(1).default('olbun-desarrollo'),
 });
 
-const serverSchemaValidado = serverSchema.refine(
-  (env) => Boolean(env.GOOGLE_CLIENT_ID) === Boolean(env.GOOGLE_CLIENT_SECRET),
-  {
+const serverSchemaValidado = serverSchema
+  .refine((env) => Boolean(env.GOOGLE_CLIENT_ID) === Boolean(env.GOOGLE_CLIENT_SECRET), {
     message: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together, or neither',
     path: ['GOOGLE_CLIENT_ID'],
-  },
-);
+  })
+  .refine((env) => env.MAIL_TRANSPORT !== 'smtp' || Boolean(env.SMTP_URL), {
+    message: 'SMTP_URL is required when MAIL_TRANSPORT is smtp',
+    path: ['SMTP_URL'],
+  });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 

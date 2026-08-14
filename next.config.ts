@@ -56,7 +56,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Server Actions are the only mutation entry point (SPEC §3).
     serverActions: {
-      bodySizeLimit: '2mb',
+      // M6 accepts exported correspondence up to 25 MB; leave enough room for
+      // multipart framing while the server action applies the stricter limit.
+      bodySizeLimit: '30mb',
     },
   },
   headers() {

@@ -9,6 +9,12 @@ allowBuilds:
   sharp: true # native image pipeline for next/image
   unrs-resolver: true # native module resolver used by eslint-plugin-import
 
+# Security fixes for transitive versions bundled by Next.js. Keep these pinned
+# until the direct dependency range resolves to an equally new release.
+overrides:
+  postcss: 8.5.26
+  sharp: 0.35.3
+
 # Versions published more recently than pnpm's minimum release age. Reviewed and
 # accepted; re-check when bumping.
 minimumReleaseAgeExclude:

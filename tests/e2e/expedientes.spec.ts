@@ -123,9 +123,18 @@ test.describe('Expedientes', () => {
     await page.getByRole('button', { name: 'Abrir expediente' }).click();
 
     await expect(page).toHaveURL(new RegExp(`/${cred.slug}/expedientes/[a-z0-9]+$`));
+    // The URL changes as soon as the redirect starts. Wait for content unique
+    // to the destination before starting a second navigation, otherwise an
+    // unrealistically fast desktop click can cancel the redirect while its
+    // cache-invalidation instruction is still arriving.
+    await expect(
+      page.getByRole('heading', { name: 'Penalidad con plazo vivo', level: 1 }),
+    ).toBeVisible();
 
     // Navegando como navega una persona, por el menú, para comprobar de paso
     // que abrir un expediente refresca la lista de plazos.
+    const abrirMenu = page.getByRole('button', { name: 'Abrir el menú' });
+    if (await abrirMenu.isVisible()) await abrirMenu.click();
     await page
       .getByRole('navigation', { name: 'Secciones' })
       .getByRole('link', { name: 'Plazos' })

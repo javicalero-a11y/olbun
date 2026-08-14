@@ -8,7 +8,7 @@ import { BotonEnviar, ErrorGeneral } from '@/components/features/auth/campo';
 const INICIAL: EstadoComunicaciones = {};
 
 /**
- * Uploading a `.eml`.
+ * Uploading an exported message or a PDF copy of one.
  *
  * Linking to a contract is offered here rather than left for later: the person
  * uploading is the one who knows which contract it belongs to, and a message
@@ -38,20 +38,20 @@ export function FormularioSubida({
 
       <div className="space-y-1.5">
         <label htmlFor="archivo" className="block text-sm font-medium">
-          Archivo .eml
+          Correo o PDF
         </label>
         <input
           id="archivo"
           name="archivo"
           type="file"
-          accept=".eml,message/rfc822"
+          accept=".eml,.msg,.pdf,message/rfc822,application/vnd.ms-outlook,application/pdf"
           required
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1 file:text-sm"
           aria-describedby="archivo-ayuda"
         />
         <p id="archivo-ayuda" className="text-xs text-muted-foreground">
-          Arrastra el correo desde Outlook o Apple Mail para obtener un .eml. Si ya lo tienes en
-          la bandeja, no se duplica.
+          Admite .eml, .msg de Outlook y PDF. Se conserva el archivo original con su huella; si
+          ya está en la bandeja, no se duplica.
         </p>
         {estado.errores?.['archivo']?.length ? (
           <p role="alert" className="text-xs text-destructive">
@@ -59,6 +59,39 @@ export function FormularioSubida({
           </p>
         ) : null}
       </div>
+
+      <fieldset className="rounded-md border border-border p-3">
+        <legend className="px-1 text-sm font-medium">Sólo cuando el archivo es un PDF</legend>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Un PDF no trae las cabeceras del correo. Indica quién lo envió; el asunto es opcional.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="remitentePdf" className="block text-sm font-medium">
+              Remitente del PDF
+            </label>
+            <input
+              id="remitentePdf"
+              name="remitentePdf"
+              type="text"
+              placeholder="contratacion@ayuntamiento.es"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="asuntoPdf" className="block text-sm font-medium">
+              Asunto del PDF
+            </label>
+            <input
+              id="asuntoPdf"
+              name="asuntoPdf"
+              type="text"
+              placeholder="Se usa el nombre del archivo si se deja vacío"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

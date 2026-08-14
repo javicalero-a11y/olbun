@@ -1,5 +1,7 @@
 import 'server-only';
 
+import nodemailer from 'nodemailer';
+
 import { logger } from '@/lib/logger';
 import { serverEnv } from '@/lib/env';
 
@@ -33,6 +35,24 @@ class ConsoleMailService implements MailService {
   }
 }
 
+class SmtpMailService implements MailService {
+  private readonly transporte;
+
+  constructor(url: string) {
+    this.transporte = nodemailer.createTransport(url);
+  }
+
+  async enviar(mensaje: Mensaje): Promise<void> {
+    await this.transporte.sendMail({
+      from: serverEnv().AUTH_EMAIL_FROM ?? 'no-reply@olbun.es',
+      to: mensaje.para,
+      subject: mensaje.asunto,
+      text: mensaje.texto,
+      html: mensaje.html,
+    });
+  }
+}
+
 /**
  * Placeholder for the production transport. Deliberately throws rather than
  * silently dropping mail: an invitation that is never delivered and never
@@ -55,10 +75,13 @@ class UnconfiguredMailService implements MailService {
 let instancia: MailService | undefined;
 
 export function mailService(): MailService {
+  const env = serverEnv();
   instancia ??=
-    serverEnv().NODE_ENV === 'production'
-      ? new UnconfiguredMailService()
-      : new ConsoleMailService();
+    env.MAIL_TRANSPORT === 'smtp' && env.SMTP_URL
+      ? new SmtpMailService(env.SMTP_URL)
+      : env.MAIL_TRANSPORT === 'console' || env.NODE_ENV !== 'production'
+        ? new ConsoleMailService()
+        : new UnconfiguredMailService();
 
   return instancia;
 }

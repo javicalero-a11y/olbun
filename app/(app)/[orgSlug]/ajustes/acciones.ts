@@ -8,7 +8,7 @@ import { crearAccion, ErrorDeCampo } from '@/lib/actions/crear-accion';
 import { registrarEvento } from '@/lib/audit/registrar';
 import { requirePermission } from '@/lib/auth/guardias';
 import { generarAltaMfa, generarCodigosRecuperacion, verificarCodigoMfa } from '@/lib/auth/mfa';
-import { identityClientBecause, tenantClient } from '@/lib/db/tenant';
+import { identityClientBecause, tenantTransaction } from '@/lib/db/tenant';
 import { crearInvitacion } from '@/lib/services/invitaciones';
 import { emailSchema } from '@/lib/validation/auth';
 
@@ -302,8 +302,7 @@ export async function desactivarMfa(orgSlug: string): Promise<EstadoMfa> {
   // Turning the second factor off is the single change an attacker most wants
   // unrecorded, so it is audited even though the user row it touches is not
   // tenant-scoped and therefore cannot share the write's transaction.
-  const tenant = tenantClient(contexto.organisation.id);
-  await tenant.$transaction(async (tx) => {
+  await tenantTransaction(contexto.organisation.id, async (tx) => {
     await registrarEvento(
       tx,
       {

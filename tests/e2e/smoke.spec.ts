@@ -28,16 +28,15 @@ test.describe('M0 smoke', () => {
     expect(headers['x-powered-by']).toBeUndefined();
   });
 
-  test('the dev server never sends HSTS or asks for HTTPS upgrades', async ({ request }) => {
-    // Both belong in production only. Over plaintext they pin localhost to
-    // HTTPS in the browser for two years — and `includeSubDomains` takes every
-    // other local project with it. The browser keeps honouring the pin long
-    // after the server stops sending it, so the only cure is clearing its HSTS
-    // store by hand. That is expensive enough to be worth a test.
+  test('the production server sends HSTS and upgrades insecure requests', async ({
+    request,
+  }) => {
+    // Playwright starts the built server. Development-only absence is covered
+    // by next.config's isDev branch and does not belong in this production E2E.
     const response = await request.get('/');
     const headers = response.headers();
 
-    expect(headers['strict-transport-security']).toBeUndefined();
-    expect(headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+    expect(headers['strict-transport-security']).toContain('max-age=63072000');
+    expect(headers['content-security-policy']).toContain('upgrade-insecure-requests');
   });
 });

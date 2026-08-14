@@ -81,22 +81,14 @@ test.describe('Entrar por otros medios', () => {
     await expect(page.getByText('verificación en dos pasos activada')).toBeVisible();
   });
 
-  test('sin credenciales, Google y Microsoft se ven pero no se pueden pulsar', async ({
-    page,
-  }) => {
-    // En desarrollo se muestran desactivados, para poder revisar la pantalla
-    // sin tener que crear antes las aplicaciones en Google Cloud y en Entra. Lo
-    // que no puede pasar es que se puedan pulsar y fallen: en producción
-    // directamente no aparecen.
+  test('en producción no ofrece proveedores sin credenciales', async ({ page }) => {
+    // Playwright runs `next build && next start`: this is the production rule.
+    // The disabled preview buttons remain covered by the provider unit tests.
     await page.goto('/acceso');
 
     for (const nombre of [/Google/, /Microsoft/]) {
-      const boton = page.getByRole('button', { name: nombre });
-      await expect(boton).toBeVisible();
-      await expect(boton).toBeDisabled();
+      await expect(page.getByRole('button', { name: nombre })).toHaveCount(0);
     }
-
-    await expect(page.getByText('Sólo en desarrollo').first()).toBeVisible();
   });
 });
 

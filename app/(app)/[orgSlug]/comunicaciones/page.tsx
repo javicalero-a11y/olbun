@@ -2,12 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { requirePermission } from '@/lib/auth/guardias';
+import { can } from '@/lib/auth/can';
 import { tenantClient } from '@/lib/db/tenant';
+import { serverEnv } from '@/lib/env';
 import { analizarComunicacionAccion } from '../detecciones/acciones';
 import { BotonAnalizar } from '@/components/features/detecciones/boton-analizar';
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 import { FormularioSubida } from '@/components/features/comunicaciones/formulario-subida';
-import { subirComunicacion } from './acciones';
+import { PanelAlias } from '@/components/features/comunicaciones/panel-alias';
+import { crearAliasReenvio, subirComunicacion } from './acciones';
 
 export const metadata: Metadata = { title: 'Comunicaciones' };
 
@@ -39,7 +42,8 @@ export default async function ComunicacionesPage({
   const contexto = await requirePermission(orgSlug, 'comunicacion:view');
   const db = tenantClient(contexto.organisation.id);
 
-  const [comunicaciones, contratos] = await Promise.all([
+  const puedeGestionarBuzones = can(contexto.actor, 'buzon:manage');
+  const [comunicaciones, contratos, aliases] = await Promise.all([
     db.comunicacion.findMany({
       where: { deletedAt: null },
       select: {
@@ -60,28 +64,57 @@ export default async function ComunicacionesPage({
       select: { id: true, numeroExpediente: true, objeto: true },
       orderBy: { numeroExpediente: 'asc' },
     }),
+    puedeGestionarBuzones
+      ? db.buzonConectado.findMany({
+          where: { tipo: 'ALIAS_REENVIO', deletedAt: null },
+          select: {
+            id: true,
+            direccion: true,
+            contrato: { select: { numeroExpediente: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : Promise.resolve([]),
   ]);
 
   const accion = subirComunicacion.bind(null, orgSlug);
   const accionAnalizar = analizarComunicacionAccion.bind(null, orgSlug);
+  const accionAlias = crearAliasReenvio.bind(null, orgSlug);
+  const opcionesContrato = contratos.map((contrato) => ({
+    id: contrato.id,
+    etiqueta: `${contrato.numeroExpediente} — ${contrato.objeto}`,
+  }));
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Comunicaciones</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          La correspondencia del contrato, en un sitio y sin duplicados. De momento se carga a
-          mano; los buzones conectados y el alias de reenvío llegan después.
+          La correspondencia del contrato, en un sitio y sin duplicados. Carga exportaciones de
+          correo o usa un alias; los buzones OAuth llegan en M8.
         </p>
       </div>
 
-      <FormularioSubida
-        accion={accion}
-        contratos={contratos.map((contrato) => ({
-          id: contrato.id,
-          etiqueta: `${contrato.numeroExpediente} — ${contrato.objeto}`,
-        }))}
-      />
+      <FormularioSubida accion={accion} contratos={opcionesContrato} />
+
+      {puedeGestionarBuzones ? (
+        <PanelAlias
+          accion={accionAlias}
+          aliases={aliases.flatMap((alias) =>
+            alias.direccion
+              ? [
+                  {
+                    id: alias.id,
+                    direccion: alias.direccion,
+                    contrato: alias.contrato?.numeroExpediente ?? null,
+                  },
+                ]
+              : [],
+          )}
+          contratos={opcionesContrato}
+          operativo={Boolean(serverEnv().INBOUND_EMAIL_SECRET)}
+        />
+      ) : null}
 
       <Tabla
         titulo="Correspondencia recibida, primero lo que nadie ha revisado"
@@ -105,9 +138,9 @@ export default async function ComunicacionesPage({
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {comunicacion.direccion === 'ENTRANTE' ? 'De' : 'Para'} {comunicacion.de}
                   {comunicacion._count.adjuntos > 0
-                    ? ` · ${String(comunicacion._count.adjuntos)} adjunto${
+                    ? ` · ${String(comunicacion._count.adjuntos)} archivo${
                         comunicacion._count.adjuntos === 1 ? '' : 's'
-                      }`
+                      } conservado${comunicacion._count.adjuntos === 1 ? '' : 's'}`
                     : ''}
                 </p>
               </>

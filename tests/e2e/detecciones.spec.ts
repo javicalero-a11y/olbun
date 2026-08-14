@@ -44,7 +44,7 @@ async function registrar(page: Page) {
 /** Uploads the fixture and runs the engine over it. */
 async function subirYAnalizar(page: Page, slug: string, archivo = 'penalidad.eml') {
   await page.goto(`/${slug}/comunicaciones`);
-  await page.getByLabel('Archivo .eml').setInputFiles(path.join(FIXTURES, archivo));
+  await page.getByLabel('Correo o PDF').setInputFiles(path.join(FIXTURES, archivo));
   await page.getByRole('button', { name: 'Añadir a la bandeja' }).click();
   await expect(page.getByRole('status').first()).toContainText('añadido a la bandeja');
 

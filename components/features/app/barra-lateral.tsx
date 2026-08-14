@@ -59,6 +59,7 @@ export function BarraLateral({
               <Link
                 key={seccion.ruta}
                 href={destino}
+                prefetch={false}
                 onClick={alCerrar}
                 aria-current={activa ? 'page' : undefined}
                 className={`rounded-md px-3 py-2 text-sm transition-colors ${

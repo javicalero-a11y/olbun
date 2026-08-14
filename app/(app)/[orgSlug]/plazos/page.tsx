@@ -9,6 +9,10 @@ import { EtiquetaPlazo } from '@/components/features/expedientes/aviso-plazo';
 import { formatearEs, hoyEn, type FechaCivil } from '@/lib/domain/fecha';
 
 export const metadata: Metadata = { title: 'Plazos' };
+// This page is an operational alarm, not a report snapshot. It must never
+// reuse the empty response a browser saw immediately before creating a plazo.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function aCivil(valor: Date): FechaCivil;
 function aCivil(valor: Date | null): FechaCivil | undefined;

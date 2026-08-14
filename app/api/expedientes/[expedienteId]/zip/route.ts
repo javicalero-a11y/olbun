@@ -4,7 +4,7 @@ import { exportarExpediente } from '@/lib/services/exportacion';
 import { logger } from '@/lib/logger';
 import { registrarEvento } from '@/lib/audit/registrar';
 import { requirePermission } from '@/lib/auth/guardias';
-import { tenantClient } from '@/lib/db/tenant';
+import { tenantClient, tenantTransaction } from '@/lib/db/tenant';
 
 /**
  * The whole expediente as a zip.
@@ -49,7 +49,7 @@ export async function GET(
     return NextResponse.json({ error: 'No se pudo generar el archivo.' }, { status: 500 });
   }
 
-  await db.$transaction(async (tx) => {
+  await tenantTransaction(sesion.organisation.id, async (tx) => {
     await registrarEvento(
       tx,
       {

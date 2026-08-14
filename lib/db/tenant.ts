@@ -141,15 +141,93 @@ function scopeArgs(
 export type TenantClient = ReturnType<typeof tenantClient>;
 
 /**
- * The client handed to a `$transaction` callback on a tenant-scoped client.
- *
- * Derived rather than written out: the extension changes the client's type, so
- * `Prisma.TransactionClient` does not match it and any hand-written stand-in
- * drifts the moment a model is added.
+ * The client handed to a tenant transaction. It is a Prisma transaction client
+ * wrapped by `scopeTransaction`: RLS and query injection both stay on the same
+ * physical transaction and therefore the same database connection.
  */
 export type TenantTransactionClient = Parameters<
   Parameters<TenantClient['$transaction']>[0]
 >[0];
+
+const MODEL_BY_DELEGATE = new Map(
+  [...TENANT_OWNED].map((model) => [
+    `${model.slice(0, 1).toLowerCase()}${model.slice(1)}`,
+    model,
+  ]),
+);
+
+/**
+ * Adds the same argument scoping used by the ordinary tenant client to a raw
+ * interactive-transaction client.
+ *
+ * Prisma transaction clients cannot be `$extends`-ed. A narrow proxy over the
+ * generated model delegates keeps the second isolation layer without opening
+ * another connection. Non-model methods are bound unchanged.
+ */
+function scopeTransaction(
+  raw: Prisma.TransactionClient,
+  organisationId: string,
+): TenantTransactionClient {
+  const delegateCache = new Map<string, object>();
+
+  return new Proxy(raw, {
+    get(target, property, receiver) {
+      if (typeof property === 'string') {
+        const model = MODEL_BY_DELEGATE.get(property);
+        if (model) {
+          const cached = delegateCache.get(property);
+          if (cached) return cached;
+
+          const delegate = Reflect.get(target, property, receiver) as object;
+          const scopedDelegate = new Proxy(delegate, {
+            get(delegateTarget, operation, delegateReceiver) {
+              const original = Reflect.get(
+                delegateTarget,
+                operation,
+                delegateReceiver,
+              ) as unknown;
+              if (typeof original !== 'function' || typeof operation !== 'string')
+                return original;
+
+              return (args: UnknownArgs = {}) =>
+                Reflect.apply(original, delegateTarget, [
+                  scopeArgs(model, operation, args, organisationId),
+                ]) as unknown;
+            },
+          });
+          delegateCache.set(property, scopedDelegate);
+          return scopedDelegate;
+        }
+      }
+
+      const value = Reflect.get(target, property, receiver) as unknown;
+      if (typeof value !== 'function') return value;
+      const method = value as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) => Reflect.apply(method, target, args);
+    },
+  }) as unknown as TenantTransactionClient;
+}
+
+/**
+ * Executes a complete mutation and its audit events atomically under one RLS
+ * setting.
+ *
+ * Do not call `$transaction` on `tenantClient()`: Prisma query extensions that
+ * invoke a client-level method use a new connection and ignore the surrounding
+ * interactive transaction. This explicit boundary sets the tenant once, then
+ * scopes every model delegate without creating nested transactions.
+ */
+export async function tenantTransaction<T>(
+  organisationId: string,
+  execute: (tx: TenantTransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!organisationId) throw new Error('tenantTransaction requires an organisationId');
+
+  return prisma.$transaction(async (raw) => {
+    await raw.$executeRaw`SELECT set_config('app.current_org_id', ${organisationId}, TRUE)`;
+    return execute(scopeTransaction(raw, organisationId));
+  });
+}
 
 /**
  * Returns a Prisma client bound to one organisation. Build it once per request

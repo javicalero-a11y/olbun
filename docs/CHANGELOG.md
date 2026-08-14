@@ -4,6 +4,40 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M6 — Comunicaciones manuales y alias de reenvío (2026-08-14)
+
+- Ingesta manual de `.eml`, `.msg` de Outlook y PDF. En PDF se piden las
+  cabeceras que el formato no contiene; `.msg` se comprueba con ficheros reales
+  exportados por Outlook.
+- El original y cada adjunto se conservan en S3/MinIO con tamaño, MIME y
+  SHA-256. El HTML se sanea al entrar y nunca carga píxeles remotos.
+- Deduplicación transaccional por `Message-ID` y por huella normalizada. Los
+  índices únicos son quienes deciden incluso si dos copias llegan a la vez.
+- Alias de reenvío generales o vinculados a un contrato. El webhook entrante es
+  neutral respecto del proveedor, exige un secreto de 32 caracteres, no permite
+  enumerar alias y cambia al cliente RLS del tenant en cuanto resuelve el
+  destinatario.
+- Transporte SMTP real para invitaciones y enlaces mágicos, manteniendo un
+  transporte de consola explícito para desarrollo y pruebas.
+- Pruebas E2E de escritorio y móvil alineadas con el servidor de producción:
+  cabeceras HSTS, proveedores OAuth no configurados, navegación fresca tras
+  mutaciones y menú móvil.
+- `next-env.d.ts` queda versionado; una instalación limpia ya reconoce los
+  recursos estáticos durante el typecheck.
+- Decisión arquitectónica ADR 0007 para la única resolución global necesaria
+  antes de conocer el tenant en correo entrante.
+- Las mutaciones y su auditoría sí comparten ahora una única transacción física:
+  `tenantTransaction()` fija RLS una vez y aplica el scope mediante los delegates
+  del cliente transaccional. Una prueba contra Postgres acredita scope, bloqueo
+  entre tenants y rollback conjunto.
+- La cobertura real sube a 56,79% de líneas y 49,08% de ramas. CI la convierte
+  en un ratchet que no puede retroceder; ADR 0008 documenta por qué el antiguo
+  umbral nominal del 80% era una puerta permanentemente roja y cómo se llegará
+  al objetivo sin fingir cobertura.
+- `sharp` y `postcss` quedan fijados a versiones corregidas para eliminar las
+  vulnerabilidades transitivas notificadas por npm; la auditoría final no
+  encuentra vulnerabilidades conocidas.
+
 ## M9 — Documentos y evidencia, primera parte (2026-08-13)
 
 - MinIO en `docker-compose` y en CI. El mismo código habla con MinIO en local y

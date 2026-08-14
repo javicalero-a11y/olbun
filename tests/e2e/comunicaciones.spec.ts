@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -37,7 +38,7 @@ async function registrar(page: Page) {
 }
 
 async function subir(page: Page, archivo: string) {
-  await page.getByLabel('Archivo .eml').setInputFiles(path.join(FIXTURES, archivo));
+  await page.getByLabel('Correo o PDF').setInputFiles(path.join(FIXTURES, archivo));
   await page.getByRole('button', { name: 'Añadir a la bandeja' }).click();
   await expect(page.getByRole('status')).toBeVisible();
 }
@@ -64,6 +65,82 @@ test.describe('Comunicaciones', () => {
     await expect(fila).toBeVisible();
     await expect(fila).toContainText('contratacion@alcala.es');
     await expect(fila).toContainText('Sin revisar');
+  });
+
+  test('subir un .msg real de Outlook conserva remitente y asunto', async ({ page }) => {
+    const cred = await registrar(page);
+
+    await page.goto(`/${cred.slug}/comunicaciones`);
+    await subir(page, 'outlook-sent.msg');
+
+    const fila = page.getByRole('row').filter({ hasText: 'Sent time' });
+    await expect(fila).toBeVisible();
+    await expect(fila).toContainText('xmailuser@xmailserver.test');
+  });
+
+  test('subir un PDF pide sus cabeceras y conserva el original', async ({ page }) => {
+    const cred = await registrar(page);
+
+    await page.goto(`/${cred.slug}/comunicaciones`);
+    await page.getByLabel('Correo o PDF').setInputFiles({
+      name: 'requerimiento.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 copia escaneada'),
+    });
+    await page.getByLabel('Remitente del PDF').fill('contratacion@ayuntamiento.es');
+    await page.getByLabel('Asunto del PDF').fill('Requerimiento de documentación');
+    await page.getByRole('button', { name: 'Añadir a la bandeja' }).click();
+
+    await expect(page.getByRole('status')).toContainText('añadido a la bandeja');
+    const fila = page.getByRole('row').filter({ hasText: 'Requerimiento de documentación' });
+    await expect(fila).toContainText('contratacion@ayuntamiento.es');
+    await expect(fila).toContainText('1 archivo conservado');
+  });
+
+  test('el alias recibe RFC 822, lo vincula y también deduplica', async ({ page, request }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/comunicaciones`);
+
+    await page.getByRole('button', { name: 'Crear alias' }).click();
+    const direccion = await page
+      .locator('code')
+      .filter({ hasText: '@entrada.' })
+      .first()
+      .innerText();
+
+    const enviar = () =>
+      request.post('/api/comunicaciones/entrada', {
+        headers: {
+          authorization: 'Bearer playwright-inbound-secret-not-for-production',
+          'x-olbun-alias': direccion,
+          'content-type': 'message/rfc822',
+        },
+        data: readFileSync(path.join(FIXTURES, 'penalidad.eml')),
+      });
+
+    const sinSecreto = await request.post('/api/comunicaciones/entrada', {
+      headers: { 'x-olbun-alias': direccion, 'content-type': 'message/rfc822' },
+      data: readFileSync(path.join(FIXTURES, 'penalidad.eml')),
+    });
+    expect(sinSecreto.status()).toBe(401);
+
+    const aliasDesconocido = await request.post('/api/comunicaciones/entrada', {
+      headers: {
+        authorization: 'Bearer playwright-inbound-secret-not-for-production',
+        'x-olbun-alias': 'no-existe@entrada.olbun.local',
+        'content-type': 'message/rfc822',
+      },
+      data: readFileSync(path.join(FIXTURES, 'penalidad.eml')),
+    });
+    expect(aliasDesconocido.status()).toBe(404);
+
+    expect((await enviar()).status()).toBe(201);
+    expect((await enviar()).status()).toBe(200);
+
+    await page.reload();
+    await expect(
+      page.getByRole('row').filter({ hasText: 'Propuesta de penalidad' }),
+    ).toHaveCount(1);
   });
 
   test('el mismo archivo dos veces no se duplica', async ({ page }) => {

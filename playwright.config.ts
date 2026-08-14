@@ -46,6 +46,10 @@ export default defineConfig({
       // reached the Claude API would be slow, non-deterministic, and would
       // start costing money the day somebody put a key in their `.env`.
       MOTOR_DETECCION: 'reglas',
+      // A production build still needs a harmless transport so the magic-link
+      // round trip can be exercised without an SMTP server.
+      MAIL_TRANSPORT: 'console',
+      INBOUND_EMAIL_SECRET: 'playwright-inbound-secret-not-for-production',
     },
   },
 });

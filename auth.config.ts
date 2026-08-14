@@ -63,6 +63,9 @@ export const authConfig = {
         // URL is the credential, and it is validated by the page itself.
         pathname.startsWith('/invitacion/') ||
         pathname.startsWith('/api/auth') ||
+        // Provider-neutral inbound email webhook. It has its own bearer secret
+        // and runs before any user session exists.
+        pathname.startsWith('/api/comunicaciones/entrada') ||
         // Reached while signed out, by definition: it is the page telling you
         // to go and click the link that will sign you in.
         pathname.startsWith('/revisa-tu-correo') ||

@@ -43,6 +43,23 @@ We will enforce tenant isolation in three independent layers.
    `current_setting('app.current_org_id', true)`, set with `set_config(..., TRUE)`
    inside the same transaction as the query.
 
+### Correction recorded 2026-08-14
+
+The first implementation made each query extension call the base client's
+`$transaction`. That is valid for standalone reads, but not inside an
+interactive transaction: Prisma documents that a client-level method invoked
+from an extension uses a new connection and ignores the surrounding transaction
+context. The apparent action transaction could therefore commit model writes
+separately from its audit event.
+
+Standalone reads still use the lightweight batch transaction. Mutations now use
+`tenantTransaction(organisationId, callback)`, which opens one interactive
+transaction, applies `set_config` once, and supplies a proxy over that
+transaction's model delegates. The proxy applies the same `scopeArgs` rewrite
+without opening another connection. An integration test against Postgres proves
+that a caller-supplied foreign `organisationId` is overwritten, cross-tenant
+reads return nothing, and an exception rolls the write back.
+
 Two database roles, and this is the load-bearing part:
 
 | Role                                     | Used by                 | RLS          |
@@ -65,11 +82,11 @@ used only by Prisma's migration engine and the seed.
 
 ### Negative / accepted trade-offs
 
-- **One extra round trip per query.** Every operation is a two-statement
-  transaction. Against SPEC §8's 300 ms list budget this is the main risk, and
-  it is unmeasured until there is a realistic dataset.
-- Connection-pool pressure rises, because more of each connection's time is
-  spent inside a transaction.
+- **One extra round trip per standalone query.** Reads are two-statement batch
+  transactions; a multi-query mutation pays `set_config` once. Against SPEC
+  §8's 300 ms list budget this remains the main unmeasured risk.
+- Connection-pool pressure rises for standalone reads, although mutations no
+  longer open nested connections.
 - Two roles to provision, and production must not quietly run as the owner. A
   smoke test asserting that the app's role is neither superuser nor BYPASSRLS
   belongs in the deployment checklist.

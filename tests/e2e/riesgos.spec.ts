@@ -139,7 +139,7 @@ test.describe('De la detección al registro', () => {
 
     // Un correo con una queja formal: el motor de reglas la señala.
     await page.goto(`/${cred.slug}/comunicaciones`);
-    await page.getByLabel('Archivo .eml').setInputFiles(path.join(FIXTURES, 'queja.eml'));
+    await page.getByLabel('Correo o PDF').setInputFiles(path.join(FIXTURES, 'queja.eml'));
     await page.getByRole('button', { name: 'Añadir a la bandeja' }).click();
     await expect(page.getByRole('status').first()).toContainText('añadido a la bandeja');
     await page.getByRole('button', { name: 'Analizar' }).first().click();

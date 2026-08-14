@@ -6,7 +6,7 @@ import type { z } from 'zod';
 import { ForbiddenError } from '@/lib/auth/can';
 import { registrarEvento, type EventoAuditoria } from '@/lib/audit/registrar';
 import { requirePermission } from '@/lib/auth/guardias';
-import { tenantClient } from '@/lib/db/tenant';
+import { tenantTransaction } from '@/lib/db/tenant';
 import { logger } from '@/lib/logger';
 import type { Permission } from '@/lib/auth/permissions';
 import type { SessionContext } from '@/lib/auth/session';
@@ -101,7 +101,6 @@ export function crearAccion<TEntrada, TSalida>(
     // Bound before the closure so its type is the validated one, not the
     // discriminated union the narrowing above produced.
     const entrada = parsed.data;
-    const db = tenantClient(sesion.organisation.id);
     const eventos: EventoAuditoria[] = [];
 
     // 4. Execute and 5. audit, in one transaction.
@@ -123,7 +122,7 @@ export function crearAccion<TEntrada, TSalida>(
     return { ok: true, datos };
 
     async function ejecutarEnTransaccion(): Promise<TSalida> {
-      return db.$transaction(async (tx) => {
+      return tenantTransaction(sesion.organisation.id, async (tx) => {
         const salida = await definicion.ejecutar(entrada, {
           db: tx,
           sesion,
