@@ -4,6 +4,44 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M8 — Buzones conectados (2026-08-14)
+
+- Conexión delegada de buzones funcionales Google Workspace y Microsoft 365
+  con Authorization Code, `state` de un solo uso y PKCE S256. Los clientes de
+  lectura de correo están separados de «Entrar con Google/Microsoft».
+- Permisos mínimos de solo lectura: Gmail readonly o `Mail.Read` delegado. Los
+  access tokens, refresh tokens y verificadores PKCE se cifran con AES-256-GCM
+  y nunca llegan al navegador, logs ni auditoría.
+- Sincronización incremental real: `historyId` de Gmail y `deltaLink` separado
+  para Inbox/Sent Items en Graph. Solo se siguen cursores HTTPS de hosts
+  oficiales, evitando que un cursor manipulado se convierta en SSRF.
+- Carga inicial limitada a un año y 500 mensajes por ejecución. Si quedan más,
+  Olbun persiste la página exacta pendiente; no salta del mensaje 500 al correo
+  nuevo ni pierde evidencia silenciosamente.
+- Reclamación atómica de quince minutos contra sincronizaciones simultáneas,
+  descarga fuera de la transacción y persistencia tenant con RLS, deduplicación
+  y auditoría dentro de ella.
+- Los buzones personales están bloqueados salvo que consten una política
+  interna documental y la fecha de consulta a la representación de los
+  trabajadores. La plantilla DPIA deja claro que requiere aprobación del
+  responsable y su DPD/asesoría; no es un dictamen jurídico.
+- El correo nuevo recibe detección local inmediata. Con clave Anthropic, el
+  histórico puede procesarse mediante Claude Message Batches, hasta 500 por
+  lote y con un único envío por mensaje. Modelo, prompt, coste y resultado se
+  conservan, y las citas del modelo se verifican contra el original antes de
+  mostrarse a una persona.
+- Sin clave Anthropic no se envía correspondencia a terceros. Message Batches
+  no se presenta como Zero Data Retention y exige aprobación expresa en la
+  DPIA/DPA del cliente.
+- Runbook de alta para ambos proveedores, callbacks exactos, incidencias y
+  prueba de revocación. Una IP privada HTTP sirve para la demo, pero el
+  consentimiento real exige un dominio HTTPS estable.
+- La auditoría funciona también desde tareas sin contexto HTTP: conserva el
+  evento y omite únicamente IP/agente de usuario.
+- 1.233 pruebas superan el hito; la cobertura sube a 60,48% de líneas, 61,26%
+  de funciones, 50,31% de ramas y 60,91% de sentencias. El ratchet de CI se
+  eleva con ella en lugar de dejar margen para una regresión posterior.
+
 ## M6 — Comunicaciones manuales y alias de reenvío (2026-08-14)
 
 - Ingesta manual de `.eml`, `.msg` de Outlook y PDF. En PDF se piden las

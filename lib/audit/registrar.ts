@@ -113,14 +113,20 @@ export async function metadatosDePeticion(): Promise<{
   ip?: string | undefined;
   userAgent?: string | undefined;
 }> {
-  const h = await headers();
-  const reenviado = h.get('x-forwarded-for');
+  try {
+    const h = await headers();
+    const reenviado = h.get('x-forwarded-for');
 
-  return {
-    // The first entry is the client; the rest are proxies.
-    ip: reenviado?.split(',')[0]?.trim() ?? undefined,
-    userAgent: h.get('user-agent') ?? undefined,
-  };
+    return {
+      // The first entry is the client; the rest are proxies.
+      ip: reenviado?.split(',')[0]?.trim() ?? undefined,
+      userAgent: h.get('user-agent') ?? undefined,
+    };
+  } catch {
+    // Queue workers and integration services legitimately run without a Next.js
+    // request scope. Their audit events still matter; request metadata does not.
+    return {};
+  }
 }
 
 export async function registrarEvento(

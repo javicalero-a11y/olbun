@@ -34,7 +34,7 @@ import type { EntradaAnalisis, MotorDeteccion, ResultadoMotor } from './motor';
  */
 export const PROMPT_VERSION = '2026-08-12.1';
 
-const MODELO = 'claude-opus-5';
+export const MODELO_CLAUDE = 'claude-opus-5';
 
 /**
  * Enough room for thinking plus the JSON. Adaptive thinking shares this budget
@@ -156,6 +156,35 @@ function instrucciones(): string {
   ].join('\n');
 }
 
+/** Same typed request as the online engine, without streaming-only fallbacks. */
+export function parametrosClaudeBatch(
+  entrada: EntradaAnalisis,
+): Anthropic.MessageCreateParamsNonStreaming {
+  const texto = textoFuenteDe(entrada).slice(0, MAX_CARACTERES);
+  return {
+    model: MODELO_CLAUDE,
+    max_tokens: MAX_TOKENS,
+    thinking: { type: 'adaptive' },
+    output_config: {
+      effort: 'medium',
+      format: { type: 'json_schema', schema: esquemaDeSalida() },
+    },
+    system: [
+      {
+        type: 'text',
+        text: instrucciones(),
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+      },
+    ],
+    messages: [
+      {
+        role: 'user',
+        content: `Analiza este documento.\n\n<documento>\n${texto}\n</documento>`,
+      },
+    ],
+  };
+}
+
 function clientePorDefecto(): Anthropic {
   const clave = serverEnv().ANTHROPIC_API_KEY;
 
@@ -174,7 +203,7 @@ export function hayClaveDeClaude(): boolean {
 
 export function motorClaude(cliente?: Anthropic): MotorDeteccion {
   return {
-    nombre: MODELO,
+    nombre: MODELO_CLAUDE,
 
     async analizar(entrada: EntradaAnalisis): Promise<ResultadoMotor> {
       const anthropic = cliente ?? clientePorDefecto();
@@ -186,7 +215,7 @@ export function motorClaude(cliente?: Anthropic): MotorDeteccion {
         // plain request's timeout, and a timeout here would look like "the
         // message has no findings".
         const flujo = anthropic.beta.messages.stream({
-          model: MODELO,
+          model: MODELO_CLAUDE,
           max_tokens: MAX_TOKENS,
           // Opus 5's classifiers can decline a request outright. Benign legal
           // correspondence occasionally trips them — a letter about a serious

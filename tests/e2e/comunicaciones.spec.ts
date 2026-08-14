@@ -53,6 +53,27 @@ test.describe('Comunicaciones', () => {
     await expect(page.getByText('Aquí vivirá la correspondencia')).toBeVisible();
   });
 
+  test('no finge que OAuth funciona si faltan credenciales del proveedor', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/comunicaciones`);
+
+    await expect(page.getByRole('heading', { name: 'Buzones conectados' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Conectar Google Workspace' }),
+    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Conectar Microsoft 365' })).toBeDisabled();
+    await expect(page.getByText('necesitan sus credenciales OAuth')).toBeVisible();
+  });
+
+  test('un buzón personal revela la puerta laboral antes de OAuth', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/comunicaciones`);
+
+    await page.getByRole('checkbox', { name: /buzón individual/ }).check();
+    await expect(page.getByLabel('Política interna aprobada')).toBeVisible();
+    await expect(page.getByLabel('Fecha de consulta a la representación')).toBeVisible();
+  });
+
   test('subir un .eml lo deja en la bandeja con su remitente', async ({ page }) => {
     const cred = await registrar(page);
 

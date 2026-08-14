@@ -107,24 +107,27 @@ model Organisation {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships          Membership[]
-  teams                Team[]
-  accessGrants         AccessGrant[]
-  poderesAdjudicadores PoderAdjudicador[]
-  contratos            Contrato[]
-  plantillas           PlantillaProcedimiento[]
-  expedientes          Expediente[]
-  auditEvents          AuditEvent[]
-  buzones              BuzonConectado[]
-  comunicaciones       Comunicacion[]
-  adjuntos             Adjunto[]
-  detecciones          Deteccion[]
-  incidencias          Incidencia[]
-  riesgos              Riesgo[]
-  accionesCorrectoras  AccionCorrectora[]
-  tiposDocumento       TipoDocumento[]
-  documentos           Documento[]
-  versionesDocumento   VersionDocumento[]
+  memberships           Membership[]
+  teams                 Team[]
+  accessGrants          AccessGrant[]
+  poderesAdjudicadores  PoderAdjudicador[]
+  contratos             Contrato[]
+  plantillas            PlantillaProcedimiento[]
+  expedientes           Expediente[]
+  auditEvents           AuditEvent[]
+  buzones               BuzonConectado[]
+  solicitudesOAuthBuzon SolicitudOAuthBuzon[]
+  lotesDeteccion        LoteDeteccion[]
+  itemsLoteDeteccion    ItemLoteDeteccion[]
+  comunicaciones        Comunicacion[]
+  adjuntos              Adjunto[]
+  detecciones           Deteccion[]
+  incidencias           Incidencia[]
+  riesgos               Riesgo[]
+  accionesCorrectoras   AccionCorrectora[]
+  tiposDocumento        TipoDocumento[]
+  documentos            Documento[]
+  versionesDocumento    VersionDocumento[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -1045,6 +1048,31 @@ enum EstadoRevisionComunicacion {
   ARCHIVADA
 }
 
+enum EstadoOAuthBuzon {
+  PENDIENTE
+  ACTIVO
+  REQUIERE_ATENCION
+  REVOCADO
+}
+
+enum ProveedorCorreoOAuth {
+  GOOGLE
+  MICROSOFT
+}
+
+enum EstadoLoteDeteccion {
+  EN_PROCESO
+  COMPLETADO
+  PARCIAL
+  ERROR
+}
+
+enum EstadoItemLoteDeteccion {
+  PENDIENTE
+  COMPLETADO
+  ERROR
+}
+
 /// A source of correspondence (SPEC §4.3).
 ///
 /// `politicaInternaDocumentoId` and `consultaRepresentacionFechaId` are the
@@ -1062,10 +1090,32 @@ model BuzonConectado {
 
   contratoId String?
 
-  estadoOAuth          String?
+  estadoOAuth          EstadoOAuthBuzon?
   ultimaSincronizacion DateTime?
 
+  /// Provider identity and encrypted delegated credentials. Tokens are never
+  /// exposed to the browser or written to the audit log.
+  proveedorCuentaId    String?
+  tokenAccesoCifrado   String?   @db.Text
+  tokenRefrescoCifrado String?   @db.Text
+  tokenExpiraEn        DateTime?
+  scopesOAuth          String[]  @default([])
+
+  /// Opaque Gmail history id or JSON containing Graph delta links. The app
+  /// must never parse or manufacture the provider's state tokens.
+  cursorSincronizacion String?   @db.Text
+  historicoDesde       DateTime? @db.Date
+  errorSincronizacion  String?   @db.Text
+  sincronizandoDesde   DateTime?
+
+  /// Functional mailboxes are the safe default. Personal mailboxes are held
+  /// behind the Article 87 evidence gate below.
+  esPersonal Boolean @default(false)
+
   politicaInternaDocumentoId    String?
+  consultaRepresentacionFecha   DateTime? @db.Date
+  /// Legacy placeholder from the original M6 schema. Kept temporarily so a
+  /// migration never destroys an unknown value; new code does not write it.
   consultaRepresentacionFechaId String?
 
   activo Boolean @default(true)
@@ -1075,13 +1125,94 @@ model BuzonConectado {
   createdById String?
   deletedAt   DateTime?
 
-  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  contrato       Contrato?      @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  comunicaciones Comunicacion[]
+  organisation    Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato        Contrato?       @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  politicaInterna Documento?      @relation("PoliticaBuzon", fields: [politicaInternaDocumentoId], references: [id], onDelete: SetNull)
+  comunicaciones  Comunicacion[]
+  lotesDeteccion  LoteDeteccion[]
 
   @@unique([organisationId, direccion])
   @@index([organisationId, tipo])
   @@map("buzones_conectados")
+}
+
+/// A cost-efficient Claude Message Batch for an initial mailbox history.
+model LoteDeteccion {
+  id             String @id @default(cuid(2))
+  organisationId String
+  buzonId        String
+
+  proveedorLoteId String
+  estado          EstadoLoteDeteccion @default(EN_PROCESO)
+  total           Int
+  completados     Int                 @default(0)
+  fallidos        Int                 @default(0)
+  modelId         String
+  promptVersion   String
+
+  createdAt   DateTime  @default(now())
+  createdById String?
+  completedAt DateTime?
+
+  organisation Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  buzon        BuzonConectado      @relation(fields: [buzonId], references: [id], onDelete: Cascade)
+  items        ItemLoteDeteccion[]
+
+  @@unique([organisationId, proveedorLoteId])
+  @@index([organisationId, estado, createdAt])
+  @@map("lotes_deteccion")
+}
+
+model ItemLoteDeteccion {
+  id             String @id @default(cuid(2))
+  organisationId String
+  loteId         String
+  comunicacionId String
+
+  customId    String
+  estado      EstadoItemLoteDeteccion @default(PENDIENTE)
+  error       String?                 @db.Text
+  completedAt DateTime?
+  createdAt   DateTime                @default(now())
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  lote         LoteDeteccion @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  comunicacion Comunicacion  @relation(fields: [comunicacionId], references: [id], onDelete: Cascade)
+
+  @@unique([loteId, customId])
+  @@unique([loteId, comunicacionId])
+  // A message is charged and analysed at most once, even if two operators
+  // submit the same mailbox at the same time.
+  @@unique([organisationId, comunicacionId])
+  @@index([organisationId, estado])
+  @@map("items_lote_deteccion")
+}
+
+/// One-time, server-side OAuth handshake. The public state is stored only as a
+/// SHA-256 hash and is consumed atomically, which prevents both CSRF and replay.
+model SolicitudOAuthBuzon {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  proveedor           ProveedorCorreoOAuth
+  stateHash           String               @unique
+  pkceVerifierCifrado String               @db.Text
+  solicitadoPorId     String
+
+  contratoId                  String?
+  esPersonal                  Boolean   @default(false)
+  politicaInternaDocumentoId  String?
+  consultaRepresentacionFecha DateTime? @db.Date
+  historicoDesde              DateTime? @db.Date
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, expiresAt])
+  @@map("solicitudes_oauth_buzon")
 }
 
 /// One message (SPEC §4.3).
@@ -1128,12 +1259,13 @@ model Comunicacion {
   createdById String?
   deletedAt   DateTime?
 
-  organisation Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  buzon        BuzonConectado @relation(fields: [buzonId], references: [id], onDelete: Cascade)
-  contrato     Contrato?      @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  expediente   Expediente?    @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
-  adjuntos     Adjunto[]
-  detecciones  Deteccion[]
+  organisation       Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  buzon              BuzonConectado      @relation(fields: [buzonId], references: [id], onDelete: Cascade)
+  contrato           Contrato?           @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente         Expediente?         @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  adjuntos           Adjunto[]
+  detecciones        Deteccion[]
+  itemsLoteDeteccion ItemLoteDeteccion[]
 
   @@unique([organisationId, messageIdRFC])
   @@unique([organisationId, huella])
@@ -1585,12 +1717,13 @@ model Documento {
   deletedAt   DateTime?
   deletedById String?
 
-  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  tipo         TipoDocumento?     @relation(fields: [tipoId], references: [id], onDelete: SetNull)
-  contrato     Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
-  incidencia   Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
-  versiones    VersionDocumento[]
+  organisation    Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  tipo            TipoDocumento?     @relation(fields: [tipoId], references: [id], onDelete: SetNull)
+  contrato        Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente      Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  incidencia      Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+  versiones       VersionDocumento[]
+  buzonesPolitica BuzonConectado[]   @relation("PoliticaBuzon")
 
   @@index([organisationId, createdAt])
   @@index([expedienteId])

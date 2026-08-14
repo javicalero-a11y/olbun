@@ -81,4 +81,26 @@ describe('tenantTransaction', () => {
     });
     expect(persistido).toBeNull();
   });
+
+  it('el estado OAuth de un buzón tampoco cruza de organización', async () => {
+    const stateHash = randomUUID().replaceAll('-', '').padEnd(64, '0').slice(0, 64);
+    const solicitud = await tenantTransaction(organisationA, (tx) =>
+      tx.solicitudOAuthBuzon.create({
+        data: {
+          organisationId: organisationB,
+          proveedor: 'GOOGLE',
+          stateHash,
+          pkceVerifierCifrado: 'cifrado-de-prueba',
+          solicitadoPorId: 'usuario-de-prueba',
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      }),
+    );
+    expect(solicitud.organisationId).toBe(organisationA);
+
+    const ajena = await tenantTransaction(organisationB, (tx) =>
+      tx.solicitudOAuthBuzon.findFirst({ where: { id: solicitud.id } }),
+    );
+    expect(ajena).toBeNull();
+  });
 });

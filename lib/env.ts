@@ -52,6 +52,13 @@ const serverSchema = z.object({
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
   MICROSOFT_TENANT_ID: z.string().min(1).optional(),
 
+  /** Dedicated delegated-read clients for connected mailboxes (M8). */
+  GOOGLE_MAIL_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_MAIL_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_MAIL_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_MAIL_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_MAIL_TENANT_ID: z.string().min(1).default('organizations'),
+
   /** From: address for magic links. Falls back to a no-reply on APP_URL's host. */
   AUTH_EMAIL_FROM: z.email().optional(),
   MAIL_TRANSPORT: z.enum(['console', 'smtp']).optional(),
@@ -103,7 +110,22 @@ const serverSchemaValidado = serverSchema
   .refine((env) => env.MAIL_TRANSPORT !== 'smtp' || Boolean(env.SMTP_URL), {
     message: 'SMTP_URL is required when MAIL_TRANSPORT is smtp',
     path: ['SMTP_URL'],
-  });
+  })
+  .refine(
+    (env) => Boolean(env.GOOGLE_MAIL_CLIENT_ID) === Boolean(env.GOOGLE_MAIL_CLIENT_SECRET),
+    {
+      message: 'GOOGLE_MAIL_CLIENT_ID and GOOGLE_MAIL_CLIENT_SECRET must be set together',
+      path: ['GOOGLE_MAIL_CLIENT_ID'],
+    },
+  )
+  .refine(
+    (env) =>
+      Boolean(env.MICROSOFT_MAIL_CLIENT_ID) === Boolean(env.MICROSOFT_MAIL_CLIENT_SECRET),
+    {
+      message: 'MICROSOFT_MAIL_CLIENT_ID and MICROSOFT_MAIL_CLIENT_SECRET must be set together',
+      path: ['MICROSOFT_MAIL_CLIENT_ID'],
+    },
+  );
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
