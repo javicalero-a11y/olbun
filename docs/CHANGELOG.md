@@ -4,6 +4,34 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M9 — Documentos y evidencia (completo, 2026-08-14)
+
+- ClamAV oficial en Docker y CI. Cada versión se envía por `INSTREAM`; solo un
+  veredicto `LIMPIO` permite descargar, extraer o exportar. Una caída queda
+  `NO_ANALIZADO`, bloqueada y reintentable: nunca se pinta de verde.
+- Cuarentena real comprobada con EICAR. Las versiones infectadas no ofrecen
+  enlace, no pasan por parsers y se excluyen expresamente de los expedientes.
+- OCR local en español con Tesseract, sin API ni transferencia a terceros.
+  Renderiza PDF escaneado, guarda páginas, confianza y resultado completo o
+  parcial, y vuelve buscable el texto desde la tabla.
+- Búsqueda full-text española mediante `tsvector` generado e índice GIN. Busca
+  en todas las versiones limpias, ordena por relevancia y se ejecuta bajo RLS;
+  la integración prueba flexiones y aislamiento entre tenants.
+- Exportación mejorada: `indice.pdf` imprimible y paginado, cronología Markdown,
+  `manifest.csv` con ruta, versión, tamaño y SHA-256, además de los ficheros
+  íntegros. Lo omitido siempre deja una incidencia en el índice.
+- Papelera recuperable con motivo y restauración de identidad, versiones y
+  bytes. La purga por retención sigue siendo la única destrucción irreversible.
+- Bloqueo legal operable desde la tabla: registra quién, cuándo y por qué, exige
+  motivo también al retirarlo e impide papelera y purga.
+- Cinco documentos plausibles con bytes reales, hashes, contratos y un hold
+  legal enriquecen el tenant `servicios-guadaira` de la demo.
+- ADR 0010 y runbook operativo para ClamAV, OCR, cuarentena, papelera y purga.
+- 1.268 pruebas unitarias y de integración, más 146 flujos E2E en escritorio y
+  móvil, superan el hito. La cobertura sube a 62,85% de líneas, 62,84% de
+  funciones, 52,40% de ramas y 63,01% de sentencias; el ratchet de CI vuelve a
+  subir con el resultado real.
+
 ## M8 — Buzones conectados (2026-08-14)
 
 - Conexión delegada de buzones funcionales Google Workspace y Microsoft 365
@@ -76,7 +104,7 @@ SPEC §12.
   vulnerabilidades transitivas notificadas por npm; la auditoría final no
   encuentra vulnerabilidades conocidas.
 
-## M9 — Documentos y evidencia, primera parte (2026-08-13)
+## M9 — Documentos y evidencia, primera entrega (2026-08-13)
 
 - MinIO en `docker-compose` y en CI. El mismo código habla con MinIO en local y
   con S3 en producción: sólo cambian el endpoint y las credenciales.

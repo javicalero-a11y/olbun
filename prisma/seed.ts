@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { CALENDARIOS_SEMILLA } from './calendarios';
 import { sembrarDemo } from './demo';
+import { sembrarDocumentosDemo } from './documentos-demo';
 
 /**
  * Semilla del tenant de demostración.
@@ -83,10 +84,12 @@ async function main(): Promise<void> {
   }
 
   await sembrarDemo(prisma, organisation.id);
+  const totalDocumentos = await sembrarDocumentosDemo(prisma, organisation.id);
   const totalContratos = await prisma.contrato.count({
     where: { organisationId: organisation.id },
   });
   console.log(`Contratos de demostración: ${String(totalContratos)}`);
+  console.log(`Documentos de demostración: ${String(totalDocumentos)}`);
 
   const totalFestivos = await prisma.festivo.count();
   console.log(

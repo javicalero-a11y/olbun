@@ -1659,6 +1659,18 @@ enum EstadoAnalisis {
   NO_ANALIZADO
 }
 
+/// Where a version is in the extraction/OCR pipeline. This is deliberately
+/// separate from antivirus: a clean scanned PDF may still be waiting for OCR.
+enum EstadoIndexacion {
+  PENDIENTE
+  EXTRAIDO
+  OCR_PENDIENTE
+  OCR_COMPLETADO
+  OCR_PARCIAL
+  NO_SOPORTADO
+  ERROR
+}
+
 /// A kind of document, configurable per tenant and seeded in Spanish.
 ///
 /// Retention lives here rather than on each document: policy is a property of
@@ -1709,13 +1721,19 @@ model Documento {
 
   /// Set when the document is evidence somebody must not delete — a retention
   /// hold in the litigation sense. Blocks deletion regardless of policy.
-  bloqueadoPorLitigio Boolean @default(false)
+  bloqueadoPorLitigio Boolean   @default(false)
+  bloqueadoEn         DateTime?
+  bloqueadoPorId      String?
+  motivoBloqueo       String?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  createdById String?
-  deletedAt   DateTime?
-  deletedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  deletedAt     DateTime?
+  deletedById   String?
+  motivoBorrado String?
+  restoredAt    DateTime?
+  restoredById  String?
 
   organisation    Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   tipo            TipoDocumento?     @relation(fields: [tipoId], references: [id], onDelete: SetNull)
@@ -1726,6 +1744,7 @@ model Documento {
   buzonesPolitica BuzonConectado[]   @relation("PoliticaBuzon")
 
   @@index([organisationId, createdAt])
+  @@index([organisationId, deletedAt, createdAt])
   @@index([expedienteId])
   @@index([contratoId])
   @@index([incidenciaId])
@@ -1763,7 +1782,12 @@ model VersionDocumento {
 
   /// Extracted for search. Null until extraction runs, empty for a file that
   /// genuinely has no text.
-  textoExtraido String?
+  textoExtraido    String?
+  estadoIndexacion EstadoIndexacion @default(PENDIENTE)
+  motivoIndexacion String?
+  indexadoEn       DateTime?
+  ocrPaginas       Int?
+  ocrConfianza     Float?
 
   createdAt   DateTime  @default(now())
   createdById String?

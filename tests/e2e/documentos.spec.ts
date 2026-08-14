@@ -1,4 +1,13 @@
-import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { createCanvas } from '@napi-rs/canvas';
+import JSZip from 'jszip';
+import { PDFDocument } from 'pdf-lib';
+import { expect, test } from '@playwright/test';
+
+import {
+  registrarOrganizacionDocumental as registrar,
+  subirDocumento as subir,
+} from './helpers/documentos';
 
 /**
  * Documents and evidence (SPEC §4.6, M9).
@@ -9,42 +18,6 @@ import { expect, test, type Page } from '@playwright/test';
  * auditor, to an inspection — rests on being able to answer "what did this say
  * in March", and a store that overwrites cannot.
  */
-
-function credenciales() {
-  const sufijo = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  return {
-    nombre: 'Marta Iglesias',
-    empresa: `Documentos ${sufijo}, S.L.`,
-    email: `documentos.${sufijo}@ejemplo.test`,
-    password: 'contrasena-larga-de-prueba',
-    slug: `documentos-${sufijo}`,
-  };
-}
-
-async function registrar(page: Page) {
-  const cred = credenciales();
-  await page.goto('/registro');
-  await page.getByLabel('Tu nombre').fill(cred.nombre);
-  await page.getByLabel('Empresa').fill(cred.empresa);
-  await page.getByLabel('Correo electrónico').fill(cred.email);
-  await page.getByLabel('Contraseña').fill(cred.password);
-  await page.getByRole('button', { name: 'Crear cuenta' }).click();
-  await expect(page).toHaveURL(new RegExp(`/${cred.slug}$`));
-  return cred;
-}
-
-/** Uploads an in-memory file, so the fixtures directory stays for real samples. */
-async function subir(page: Page, nombre: string, contenido: string, tipo?: string) {
-  await page.getByLabel('Archivo').setInputFiles({
-    name: nombre,
-    mimeType: 'text/plain',
-    buffer: Buffer.from(contenido),
-  });
-
-  if (tipo) await page.getByLabel('Tipo documental').selectOption({ label: tipo });
-
-  await page.getByRole('button', { name: 'Subir documento' }).click();
-}
 
 test.describe('Documentos', () => {
   test('un almacén nuevo explica para qué sirve', async ({ page }) => {
@@ -93,7 +66,7 @@ test.describe('Documentos', () => {
     await expect(fila).toContainText('Sin política');
   });
 
-  test('nada se sube sin analizar y se dice que no se ha analizado', async ({ page }) => {
+  test('cada subida recibe un veredicto antivirus real', async ({ page }) => {
     const cred = await registrar(page);
     await page.goto(`/${cred.slug}/documentos`);
 
@@ -103,11 +76,23 @@ test.describe('Documentos', () => {
     await expect(page.getByRole('status')).toBeVisible();
     await page.reload();
 
-    // El antivirus llega más adelante en este hito. Hasta entonces la pantalla
-    // dice «sin analizar» en vez de dar a entender que está limpio.
     await expect(page.getByRole('row').filter({ hasText: 'aviso.txt' })).toContainText(
-      'Sin analizar',
+      'Limpio',
     );
+  });
+
+  test('ClamAV pone EICAR en cuarentena y no permite descargarlo', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+    const eicar = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
+
+    await subir(page, 'eicar.com.txt', eicar);
+    await expect(page.getByRole('status')).toContainText('cuarentena');
+    await page.reload();
+
+    const fila = page.getByRole('row').filter({ hasText: 'eicar.com.txt' });
+    await expect(fila).toContainText('Rechazado');
+    await expect(fila.getByRole('link', { name: 'eicar.com.txt' })).toHaveCount(0);
   });
 
   test('se puede descargar lo que se ha subido', async ({ page }) => {
@@ -226,9 +211,47 @@ test.describe('Búsqueda', () => {
     await page.getByRole('main').getByRole('button', { name: 'Buscar' }).click();
 
     await expect(page.getByText('Nada coincide con esa búsqueda')).toBeVisible();
-    // Y avisa de que un escaneado sin OCR no tiene texto que indexar, que es
-    // la razón más probable de que algo que existe no aparezca.
-    await expect(page.getByText(/escaneados sin OCR/)).toBeVisible();
+    await expect(page.getByText(/escaneados aparecen en cuanto/)).toBeVisible();
+  });
+});
+
+test.describe('OCR', () => {
+  test.setTimeout(60_000);
+
+  test('un PDF escaneado se vuelve buscable desde la propia tabla', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+
+    const lienzo = createCanvas(1200, 360);
+    const contexto = lienzo.getContext('2d');
+    contexto.fillStyle = '#fff';
+    contexto.fillRect(0, 0, 1200, 360);
+    contexto.fillStyle = '#000';
+    contexto.font = 'bold 86px sans-serif';
+    contexto.fillText('EXPEDIENTE 2026', 90, 215);
+    const pdf = await PDFDocument.create();
+    const imagen = await pdf.embedPng(await lienzo.encode('png'));
+    const hoja = pdf.addPage([1200, 360]);
+    hoja.drawImage(imagen, { x: 0, y: 0, width: 1200, height: 360 });
+
+    await page.getByLabel('Archivo').setInputFiles({
+      name: 'expediente-escaneado.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from(await pdf.save()),
+    });
+    await page.getByRole('button', { name: 'Subir documento' }).click();
+    await expect(page.getByRole('status')).toContainText('pendiente de OCR');
+    await page.reload();
+
+    const fila = page.getByRole('row').filter({ hasText: 'expediente-escaneado.pdf' });
+    await fila.getByRole('button', { name: 'Ejecutar OCR' }).click();
+    await expect(fila.getByRole('status')).toContainText('OCR completado', { timeout: 30_000 });
+
+    await page.getByLabel('Buscar en los documentos').fill('EXPEDIENTE 2026');
+    await page.getByRole('main').getByRole('button', { name: 'Buscar' }).click();
+    await expect(
+      page.getByRole('row').filter({ hasText: 'expediente-escaneado.pdf' }),
+    ).toBeVisible();
   });
 });
 
@@ -253,6 +276,62 @@ test.describe('Exportar el expediente', () => {
     const archivo = await descarga;
 
     expect(archivo.suggestedFilename()).toMatch(/^EXP-\d{4}-\d{4}\.zip$/);
+    const ruta = await archivo.path();
+    expect(ruta).not.toBeNull();
+    const zip = await JSZip.loadAsync(await readFile(ruta ?? ''));
+    expect(zip.file('indice.pdf')).not.toBeNull();
+    expect(zip.file('manifest.csv')).not.toBeNull();
+    const indicePdf = await zip.file('indice.pdf')?.async('nodebuffer');
+    expect(indicePdf?.subarray(0, 4).toString()).toBe('%PDF');
+  });
+});
+
+test.describe('Papelera y bloqueo legal', () => {
+  test('el borrado ordinario conserva y restaura todas las versiones', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+    await subir(page, 'duplicado.txt', 'Documento que se restaurará.');
+    await expect(page.getByRole('status')).toBeVisible();
+    await page.reload();
+
+    const fila = page.getByRole('row').filter({ hasText: 'duplicado.txt' });
+    await fila.getByText('Gestionar').click();
+    await fila
+      .getByLabel('Motivo del borrado recuperable')
+      .fill('Duplicado confirmado por administración.');
+    await fila.getByRole('button', { name: 'Enviar a la papelera' }).click();
+    await expect(fila).toHaveCount(0);
+
+    await page.getByRole('link', { name: 'Papelera' }).click();
+    const eliminado = page.getByRole('listitem').filter({ hasText: 'duplicado.txt' });
+    await expect(eliminado).toContainText('Duplicado confirmado');
+    await eliminado.getByRole('button', { name: 'Restaurar' }).click();
+    await expect(page.getByRole('status')).toContainText('restaurado');
+    await expect(page.getByRole('row').filter({ hasText: 'duplicado.txt' })).toContainText(
+      'v1',
+    );
+  });
+
+  test('un bloqueo legal retira la opción de borrar', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/documentos`);
+    await subir(page, 'prueba-litigio.txt', 'Evidencia del procedimiento abierto.');
+    await expect(page.getByRole('status')).toBeVisible();
+    await page.reload();
+
+    let fila = page.getByRole('row').filter({ hasText: 'prueba-litigio.txt' });
+    await fila.getByText('Gestionar').click();
+    await fila
+      .getByLabel('Motivo para aplicar el bloqueo')
+      .fill('Prueba esencial del recurso todavía abierto.');
+    await fila.getByRole('button', { name: 'Bloquear como evidencia' }).click();
+    await expect(fila.getByRole('status')).toContainText('protegido');
+    await page.reload();
+
+    fila = page.getByRole('row').filter({ hasText: 'prueba-litigio.txt' });
+    await expect(fila).toContainText('Bloqueo legal');
+    await fila.getByText('Gestionar').click();
+    await expect(fila.getByRole('button', { name: 'Enviar a la papelera' })).toHaveCount(0);
   });
 });
 

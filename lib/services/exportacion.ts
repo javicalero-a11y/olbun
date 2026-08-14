@@ -2,6 +2,7 @@ import 'server-only';
 
 import JSZip from 'jszip';
 
+import { crearIndicePdfExpediente } from '@/lib/services/pdf/indice-expediente';
 import { leerObjeto } from '@/lib/storage/objetos';
 import { logger } from '@/lib/logger';
 import type { TenantTransactionClient } from '@/lib/db/tenant';
@@ -40,6 +41,11 @@ function nombreSeguro(valor: string): string {
       .replace(/^\.+/, '')
       .slice(0, 120) || 'documento'
   );
+}
+
+function celdaCsv(valor: string | number): string {
+  const texto = String(valor);
+  return /[",\n]/u.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
 }
 
 export interface ExportacionResultado {
@@ -112,8 +118,11 @@ export async function exportarExpediente(
             select: {
               numero: true,
               nombre: true,
+              mimeType: true,
+              tamano: true,
               sha256: true,
               storageKey: true,
+              estadoAnalisis: true,
               createdAt: true,
             },
             orderBy: { numero: 'desc' },
@@ -128,15 +137,34 @@ export async function exportarExpediente(
   const zip = new JSZip();
   const carpeta = zip.folder('documentos');
   const incidencias: string[] = [];
+  const manifiesto: string[][] = [
+    ['ruta', 'documento', 'version', 'fecha', 'mime_type', 'bytes', 'sha256'],
+  ];
   let incluidos = 0;
 
   for (const documento of expediente.documentos) {
     for (const version of documento.versiones) {
       const nombre = `${fecha(version.createdAt)}-v${String(version.numero)}-${nombreSeguro(version.nombre)}`;
 
+      if (version.estadoAnalisis !== 'LIMPIO') {
+        incidencias.push(
+          `- **${nombre}** — excluido: análisis antivirus ${version.estadoAnalisis.toLowerCase()}.`,
+        );
+        continue;
+      }
+
       try {
         const bytes = await leerObjeto(version.storageKey, version.sha256);
         carpeta?.file(nombre, bytes);
+        manifiesto.push([
+          `documentos/${nombre}`,
+          documento.nombre,
+          String(version.numero),
+          fecha(version.createdAt),
+          version.mimeType,
+          String(version.tamano),
+          version.sha256,
+        ]);
         incluidos += 1;
       } catch (error) {
         // Reported, never silently skipped: whoever hands this over has to
@@ -170,7 +198,9 @@ export async function exportarExpediente(
     expediente.resumen ? `## Resumen\n\n${expediente.resumen}\n` : '',
     '## Contenido de este archivo',
     '',
+    '- `indice.pdf` — índice imprimible con la ficha y la cronología.',
     '- `cronologia.md` — hitos, plazos y actuaciones.',
+    '- `manifest.csv` — ruta, versión, fecha, tamaño y SHA-256 de cada fichero.',
     `- \`documentos/\` — ${String(incluidos)} ficheros, nombrados por fecha y versión.`,
     '',
     incidencias.length > 0
@@ -231,6 +261,15 @@ export async function exportarExpediente(
 
   zip.file('indice.md', indice);
   zip.file('cronologia.md', cronologia);
+  zip.file('manifest.csv', manifiesto.map((fila) => fila.map(celdaCsv).join(',')).join('\n'));
+  zip.file(
+    'indice.pdf',
+    await crearIndicePdfExpediente({
+      referencia: expediente.referencia,
+      titulo: expediente.titulo,
+      lineas: [...indice.split('\n').slice(4), '', ...cronologia.split('\n').slice(2)],
+    }),
+  );
 
   const contenido = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 

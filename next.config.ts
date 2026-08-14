@@ -53,12 +53,21 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   typedRoutes: true,
+  // OCR renders PDFs with a platform-native canvas. Bundling its .node binary
+  // as JavaScript breaks production builds; Next loads it from the server's
+  // installed dependencies instead, where it belongs.
+  serverExternalPackages: [
+    '@napi-rs/canvas',
+    '@tesseract.js-data/spa',
+    'tesseract.js',
+    'unpdf',
+  ],
   experimental: {
     // Server Actions are the only mutation entry point (SPEC §3).
     serverActions: {
-      // M6 accepts exported correspondence up to 25 MB; leave enough room for
-      // multipart framing while the server action applies the stricter limit.
-      bodySizeLimit: '30mb',
+      // Documents accept 50 MB; leave room for multipart framing while the
+      // action itself remains the authoritative 50 MB limit.
+      bodySizeLimit: '55mb',
     },
   },
   headers() {

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { analizarConClamAV } from '@/lib/services/antivirus';
 import { extraerTextoDeArchivo } from '@/lib/services/extraccion';
 import { guardarObjeto, leerObjeto } from '@/lib/storage/objetos';
 import type { Prisma } from '@prisma/client';
@@ -122,6 +123,8 @@ export interface SubirResultado {
   contenidoRepetido: boolean;
   /** False when the file could not be read for the search index. */
   indexado: boolean;
+  estadoAnalisis: 'LIMPIO' | 'INFECTADO' | 'NO_ANALIZADO';
+  estadoIndexacion: 'EXTRAIDO' | 'OCR_PENDIENTE' | 'NO_SOPORTADO' | 'PENDIENTE' | 'ERROR';
 }
 
 /**
@@ -137,6 +140,7 @@ export async function subirDocumento(
   organisationId: string,
   datos: SubirDatos,
 ): Promise<SubirResultado> {
+  const analisis = await analizarConClamAV(datos.contenido);
   const objeto = await guardarObjeto(organisationId, datos.contenido, {
     nombre: datos.nombre,
     mimeType: datos.mimeType,
@@ -169,7 +173,34 @@ export async function subirDocumento(
       select: { id: true },
     }));
 
-  const extraido = await extraerTextoDeArchivo(datos.contenido, datos.mimeType, datos.nombre);
+  // Parsers do not touch quarantined or unscanned bytes. That is both safer and
+  // truthful: searchable content means clean content was actually inspected.
+  const extraido =
+    analisis.estado === 'LIMPIO'
+      ? await extraerTextoDeArchivo(datos.contenido, datos.mimeType, datos.nombre)
+      : null;
+
+  const estadoIndexacion = (() => {
+    if (analisis.estado !== 'LIMPIO') return 'PENDIENTE' as const;
+    if (extraido?.estado === 'EXTRAIDO' || extraido?.estado === 'VACIO') {
+      return 'EXTRAIDO' as const;
+    }
+    if (
+      datos.mimeType.toLowerCase() === 'application/pdf' ||
+      datos.nombre.toLowerCase().endsWith('.pdf')
+    ) {
+      return extraido?.motivo.includes('OCR') ? ('OCR_PENDIENTE' as const) : ('ERROR' as const);
+    }
+    return 'NO_SOPORTADO' as const;
+  })();
+
+  const motivoIndexacion = (() => {
+    if (analisis.estado === 'INFECTADO') return 'No se indexa un fichero en cuarentena.';
+    if (analisis.estado === 'NO_ANALIZADO') {
+      return 'Pendiente de un análisis antivirus correcto.';
+    }
+    return extraido?.estado === 'NO_SOPORTADO' ? extraido.motivo : null;
+  })();
 
   // Numbered from the highest existing rather than from a count, so a purged
   // version cannot make two versions share a number.
@@ -191,15 +222,18 @@ export async function subirDocumento(
       tamano: objeto.tamano,
       sha256: objeto.sha256,
       storageKey: objeto.clave,
-      // Nothing has scanned it yet, and saying so is the honest state. The
-      // scanner arrives later in this milestone; until then the download
-      // screen shows the file as unscanned rather than implying it is clean.
-      estadoAnalisis: 'PENDIENTE',
-      // Extracted inline: these are small files, and a queue for work that
-      // takes milliseconds would be infrastructure bought for nothing. Null
-      // means "could not read it", which is what the screen shows — as
-      // distinct from an empty string, which means the file had no text.
-      textoExtraido: extraido.estado === 'EXTRAIDO' ? extraido.texto : null,
+      estadoAnalisis: analisis.estado,
+      analizadoEn: new Date(),
+      motivoAnalisis:
+        analisis.estado === 'INFECTADO'
+          ? `Firma detectada: ${analisis.firma}`
+          : analisis.estado === 'NO_ANALIZADO'
+            ? analisis.motivo
+            : null,
+      textoExtraido: extraido?.estado === 'EXTRAIDO' ? extraido.texto : null,
+      estadoIndexacion,
+      motivoIndexacion,
+      indexadoEn: estadoIndexacion === 'EXTRAIDO' ? new Date() : null,
       createdById: datos.creadoPorId,
     },
     select: { id: true },
@@ -210,7 +244,9 @@ export async function subirDocumento(
     versionId: version.id,
     numero,
     contenidoRepetido: objeto.yaExistia,
-    indexado: extraido.estado === 'EXTRAIDO',
+    indexado: estadoIndexacion === 'EXTRAIDO',
+    estadoAnalisis: analisis.estado,
+    estadoIndexacion,
   };
 }
 
@@ -228,7 +264,12 @@ export async function leerVersion(
   versionId: string,
 ): Promise<{ contenido: Buffer; nombre: string; mimeType: string }> {
   const version = await db.versionDocumento.findFirst({
-    where: { id: versionId, deletedAt: null },
+    where: {
+      id: versionId,
+      deletedAt: null,
+      estadoAnalisis: 'LIMPIO',
+      documento: { deletedAt: null },
+    },
     select: { nombre: true, mimeType: true, sha256: true, storageKey: true },
   });
 

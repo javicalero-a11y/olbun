@@ -40,7 +40,7 @@ export async function GET(
   const db = tenantClient(sesion.organisation.id);
 
   const version = await db.versionDocumento.findFirst({
-    where: { id: versionId, deletedAt: null },
+    where: { id: versionId, deletedAt: null, documento: { deletedAt: null } },
     select: {
       id: true,
       numero: true,
@@ -56,11 +56,17 @@ export async function GET(
     return NextResponse.json({ error: 'No encontrado.' }, { status: 404 });
   }
 
-  // A file the scanner rejected is never handed back, whatever the link says.
-  if (version.estadoAnalisis === 'INFECTADO') {
+  // Only a positive clean verdict permits delivery. An outage or pending scan
+  // is not equivalent to clean, and an infected file stays quarantined.
+  if (version.estadoAnalisis !== 'LIMPIO') {
     return NextResponse.json(
-      { error: 'Este archivo fue rechazado por el antivirus y no se entrega.' },
-      { status: 409 },
+      {
+        error:
+          version.estadoAnalisis === 'INFECTADO'
+            ? 'Este archivo fue rechazado por el antivirus y no se entrega.'
+            : 'Este archivo todavía no tiene un análisis antivirus limpio.',
+      },
+      { status: 423 },
     );
   }
 

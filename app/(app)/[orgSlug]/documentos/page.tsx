@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
+import { can } from '@/lib/auth/can';
+import { AccionesDocumento } from '@/components/features/documentos/acciones-documento';
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 import { fragmentoAlrededor } from '@/lib/domain/documentos/texto';
 import { FormularioSubidaDocumento } from '@/components/features/documentos/formulario-subida';
 import { requirePermission } from '@/lib/auth/guardias';
-import { subir } from './acciones';
+import { buscarIdsDocumento } from '@/lib/services/busqueda-documentos';
+import { cambiarBloqueo, ejecutarOcr, eliminar, reanalizar, subir } from './acciones';
 import { tenantClient } from '@/lib/db/tenant';
 
 export const metadata: Metadata = { title: 'Documentos' };
@@ -15,6 +18,16 @@ const ETIQUETA_ANALISIS: Record<string, { texto: string; clase: string }> = {
   LIMPIO: { texto: 'Limpio', clase: 'text-status-green' },
   INFECTADO: { texto: 'Rechazado', clase: 'text-destructive' },
   NO_ANALIZADO: { texto: 'No analizado', clase: 'text-muted-foreground' },
+};
+
+const ETIQUETA_INDEXACION: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  EXTRAIDO: 'Texto indexado',
+  OCR_PENDIENTE: 'Necesita OCR',
+  OCR_COMPLETADO: 'OCR completo',
+  OCR_PARCIAL: 'OCR parcial',
+  NO_SOPORTADO: 'Formato sin texto',
+  ERROR: 'Error de lectura',
 };
 
 function tamanoLegible(bytes: number): string {
@@ -42,45 +55,30 @@ export default async function DocumentosPage({
   searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; restaurado?: string }>;
 }) {
   const { orgSlug } = await params;
-  const { q } = await searchParams;
+  const { q, restaurado } = await searchParams;
   const consulta = q?.trim() ?? '';
   const contexto = await requirePermission(orgSlug, 'documento:view');
   const db = tenantClient(contexto.organisation.id);
+  const idsCoincidentes = consulta
+    ? await buscarIdsDocumento(contexto.organisation.id, consulta)
+    : [];
 
   const [documentos, tipos, expedientes] = await Promise.all([
     db.documento.findMany({
       where: {
         deletedAt: null,
-        // Searches the name, the description and the extracted text at once:
-        // people look for a document by what it is called *or* by a phrase
-        // they remember from inside it, and asking which is unreasonable.
-        // `insensitive` covers case; accents are handled by the domain helper
-        // when highlighting, and Postgres's es-ES collation does the rest.
-        ...(consulta
-          ? {
-              OR: [
-                { nombre: { contains: consulta, mode: 'insensitive' as const } },
-                { descripcion: { contains: consulta, mode: 'insensitive' as const } },
-                {
-                  versiones: {
-                    some: {
-                      deletedAt: null,
-                      textoExtraido: { contains: consulta, mode: 'insensitive' as const },
-                    },
-                  },
-                },
-              ],
-            }
-          : {}),
+        ...(consulta ? { id: { in: idsCoincidentes } } : {}),
       },
       select: {
         id: true,
         nombre: true,
         descripcion: true,
         bloqueadoPorLitigio: true,
+        bloqueadoEn: true,
+        motivoBloqueo: true,
         tipo: { select: { nombre: true, retencionAnios: true } },
         expediente: { select: { referencia: true } },
         versiones: {
@@ -90,6 +88,11 @@ export default async function DocumentosPage({
             numero: true,
             tamano: true,
             estadoAnalisis: true,
+            estadoIndexacion: true,
+            motivoAnalisis: true,
+            motivoIndexacion: true,
+            ocrPaginas: true,
+            ocrConfianza: true,
             createdAt: true,
             textoExtraido: true,
           },
@@ -112,19 +115,35 @@ export default async function DocumentosPage({
     }),
   ]);
 
-  const filas = documentos
+  const orden = new Map(idsCoincidentes.map((id, indice) => [id, indice]));
+  const documentosOrdenados = consulta
+    ? documentos.toSorted((a, b) => (orden.get(a.id) ?? 999) - (orden.get(b.id) ?? 999))
+    : documentos;
+  const puedeBloquear = can(contexto.actor, 'documento:hold');
+  const puedeEliminar = can(contexto.actor, 'documento:delete');
+
+  const filas = documentosOrdenados
     .map((documento) => ({
       ...documento,
       actual: documento.versiones[0],
-      // The line of the document the search matched, if it matched inside one.
       fragmento: consulta
-        ? fragmentoAlrededor(documento.versiones[0]?.textoExtraido ?? '', consulta)
+        ? (documento.versiones
+            .map((version) => fragmentoAlrededor(version.textoExtraido ?? '', consulta))
+            .find((valor) => valor !== null) ?? null)
         : null,
     }))
     .filter((documento) => documento.actual !== undefined);
 
   return (
     <div className="space-y-8">
+      {restaurado === '1' ? (
+        <p
+          role="status"
+          className="rounded-md border border-status-green/30 bg-status-green-subtle px-4 py-3 text-sm text-status-green"
+        >
+          Documento restaurado con todas sus versiones.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Documentos</h1>
@@ -134,12 +153,20 @@ export default async function DocumentosPage({
             marzo.
           </p>
         </div>
-        <Link
-          href={`/${orgSlug}/documentos/retencion`}
-          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
-        >
-          Conservación
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/${orgSlug}/documentos/papelera`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            Papelera
+          </Link>
+          <Link
+            href={`/${orgSlug}/documentos/retencion`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            Conservación
+          </Link>
+        </div>
       </div>
 
       <form role="search" className="flex gap-2">
@@ -184,7 +211,7 @@ export default async function DocumentosPage({
           consulta ? (
             <EstadoVacio
               titulo="Nada coincide con esa búsqueda"
-              explicacion="Se busca en el nombre, la descripción y el texto de los documentos que se han podido leer, PDF incluidos. Los escaneados sin OCR no tienen texto que indexar, así que pueden estar ahí sin aparecer."
+              explicacion="Se busca con el índice lingüístico español en el nombre, la descripción y todas las versiones limpias. Los escaneados aparecen en cuanto se ejecuta su OCR."
             />
           ) : (
             <EstadoVacio
@@ -200,16 +227,22 @@ export default async function DocumentosPage({
             esCabeceraDeFila: true,
             celda: (documento) => (
               <>
-                <a
-                  href={`/api/documentos/${documento.actual?.id ?? ''}?org=${orgSlug}`}
-                  className="text-sm font-medium underline underline-offset-4"
-                >
-                  {documento.nombre}
-                </a>
+                {documento.actual?.estadoAnalisis === 'LIMPIO' ? (
+                  <a
+                    href={`/api/documentos/${documento.actual.id}?org=${orgSlug}`}
+                    className="text-sm font-medium underline underline-offset-4"
+                  >
+                    {documento.nombre}
+                  </a>
+                ) : (
+                  <span className="text-sm font-medium">{documento.nombre}</span>
+                )}
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {documento.tipo?.nombre ?? 'Sin clasificar'}
                   {documento.descripcion ? ` · ${documento.descripcion}` : ''}
-                  {documento.actual?.textoExtraido === null ? ' · Sin indexar' : ''}
+                  {documento.actual
+                    ? ` · ${ETIQUETA_INDEXACION[documento.actual.estadoIndexacion] ?? documento.actual.estadoIndexacion}`
+                    : ''}
                 </p>
                 {documento.fragmento ? (
                   <p className="mt-1 border-l-2 border-border pl-2 text-xs text-muted-foreground italic">
@@ -238,11 +271,19 @@ export default async function DocumentosPage({
           },
           {
             clave: 'analisis',
-            encabezado: 'Antivirus',
+            encabezado: 'Seguridad e índice',
             celda: (documento) => {
               const estado = ETIQUETA_ANALISIS[documento.actual?.estadoAnalisis ?? 'PENDIENTE'];
               return (
-                <span className={`text-xs ${estado?.clase ?? ''}`}>{estado?.texto ?? '—'}</span>
+                <div className="text-xs">
+                  <span className={estado?.clase ?? ''}>{estado?.texto ?? '—'}</span>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {documento.actual
+                      ? (ETIQUETA_INDEXACION[documento.actual.estadoIndexacion] ??
+                        documento.actual.estadoIndexacion)
+                      : '—'}
+                  </p>
+                </div>
               );
             },
           },
@@ -257,10 +298,34 @@ export default async function DocumentosPage({
             encabezado: 'Conservación',
             clase: 'text-xs text-muted-foreground',
             celda: (documento) => {
-              if (documento.bloqueadoPorLitigio) return 'Bloqueado por litigio';
+              if (documento.bloqueadoPorLitigio) {
+                return documento.motivoBloqueo
+                  ? `Bloqueo legal · ${documento.motivoBloqueo}`
+                  : 'Bloqueo legal';
+              }
               const anios = documento.tipo?.retencionAnios;
               return anios == null ? 'Sin política' : `${String(anios)} años`;
             },
+          },
+          {
+            clave: 'acciones',
+            encabezado: 'Acciones',
+            celda: (documento) =>
+              documento.actual ? (
+                <AccionesDocumento
+                  documentoId={documento.id}
+                  versionId={documento.actual.id}
+                  bloqueado={documento.bloqueadoPorLitigio}
+                  estadoAnalisis={documento.actual.estadoAnalisis}
+                  estadoIndexacion={documento.actual.estadoIndexacion}
+                  puedeBloquear={puedeBloquear}
+                  puedeEliminar={puedeEliminar}
+                  ejecutarOcr={ejecutarOcr.bind(null, orgSlug)}
+                  reanalizar={reanalizar.bind(null, orgSlug)}
+                  cambiarBloqueo={cambiarBloqueo.bind(null, orgSlug)}
+                  eliminar={eliminar.bind(null, orgSlug)}
+                />
+              ) : null,
           },
           {
             clave: 'tamano',

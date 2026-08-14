@@ -51,6 +51,24 @@ services:
       retries: 10
       start_period: 10s
 
+  # Antivirus for every uploaded version. The app streams bytes over clamd's
+  # INSTREAM protocol, so this container never mounts the evidence bucket.
+  clamav:
+    image: clamav/clamav:1.5.3-debian13-slim
+    container_name: olbun-clamav
+    restart: unless-stopped
+    ports:
+      - '3310:3310'
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ['CMD-SHELL', 'clamdscan --ping 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
 volumes:
   postgres-data:
   minio-data:
+  clamav-data:

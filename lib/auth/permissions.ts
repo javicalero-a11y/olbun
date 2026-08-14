@@ -96,7 +96,9 @@ export const PERMISSIONS = [
   // --- Transversal ---
   'documento:view',
   'documento:upload',
+  'documento:hold',
   'documento:delete',
+  'documento:restore',
   'tarea:view',
   'tarea:manage',
   'informe:view',
@@ -190,6 +192,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'provision:manage',
     'documento:view',
     'documento:upload',
+    'documento:hold',
     'tarea:view',
     'tarea:manage',
     'informe:view',

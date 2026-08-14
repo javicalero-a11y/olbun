@@ -100,6 +100,14 @@ const serverSchema = z.object({
   S3_BUCKET: z.string().min(1).default('olbun-documentos'),
   S3_ACCESS_KEY: z.string().min(1).default('olbun'),
   S3_SECRET_KEY: z.string().min(1).default('olbun-desarrollo'),
+
+  /** Local/network ClamAV daemon. An outage is recorded, never called clean. */
+  CLAMAV_HOST: z.string().min(1).default('localhost'),
+  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(15_000),
+
+  /** Guardrail for CPU-heavy local OCR; a later worker may resume remaining pages. */
+  OCR_MAX_PAGES: z.coerce.number().int().min(1).max(500).default(30),
 });
 
 const serverSchemaValidado = serverSchema

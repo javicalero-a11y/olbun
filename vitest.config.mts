@@ -29,13 +29,13 @@ export default defineConfig({
         'lib/logger.ts',
       ],
       thresholds: {
-        // Ratchet from the measured 2026-08-14 baseline (ADR 0008). These are
+        // Ratchet from the measured M9 baseline (ADR 0008). These are
         // floors, not the destination: each tested milestone raises them until
         // SPEC's 80% target is real rather than a permanently red CI setting.
-        lines: 60,
-        functions: 61,
-        branches: 50,
-        statements: 60,
+        lines: 62,
+        functions: 62,
+        branches: 52,
+        statements: 63,
       },
     },
   },

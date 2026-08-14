@@ -32,11 +32,11 @@ status. Port 3100 keeps Olbun clear of other local Next.js projects on 3000.
 
 ## Commands
 
-| Command                  | Purpose                                         |
-| ------------------------ | ----------------------------------------------- |
-| `pnpm dev`               | Development server                              |
-| `pnpm check`             | Typecheck, lint and unit tests — the CI gate    |
-| `pnpm test:e2e`          | Playwright end-to-end tests                     |
-| `pnpm db:up` / `db:down` | Postgres 16 via Docker Compose (host port 5433) |
-| `pnpm db:migrate`        | Create and apply a migration                    |
-| `pnpm db:seed`           | Seed the demo tenant                            |
+| Command                  | Purpose                                          |
+| ------------------------ | ------------------------------------------------ |
+| `pnpm dev`               | Development server                               |
+| `pnpm check`             | Typecheck, lint and unit tests — the CI gate     |
+| `pnpm test:e2e`          | Playwright end-to-end tests                      |
+| `pnpm db:up` / `db:down` | Postgres, MinIO y ClamAV mediante Docker Compose |
+| `pnpm db:migrate`        | Create and apply a migration                     |
+| `pnpm db:seed`           | Seed the demo tenant                             |

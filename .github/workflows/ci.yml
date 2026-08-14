@@ -59,6 +59,15 @@ jobs:
             sleep 1
           done
 
+      - name: Start ClamAV
+        run: |
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:1.5.3-debian13-slim
+          for i in $(seq 1 120); do
+            docker exec clamav clamdscan --ping 1 && break
+            if [ "$i" = 120 ]; then docker logs clamav; exit 1; fi
+            sleep 1
+          done
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v5
