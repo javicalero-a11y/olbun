@@ -11,6 +11,9 @@ import { logger } from '@/lib/logger';
 import type { Permission } from '@/lib/auth/permissions';
 import type { SessionContext } from '@/lib/auth/session';
 import type { TenantTransactionClient } from '@/lib/db/tenant';
+import { ErrorDeCampo } from '@/lib/services/error-de-campo';
+
+export { ErrorDeCampo } from '@/lib/services/error-de-campo';
 
 /**
  * The one shape every mutation follows (AGENTS.md):
@@ -29,24 +32,6 @@ import type { TenantTransactionClient } from '@/lib/db/tenant';
 
 export type ResultadoAccion<T> =
   { ok: true; datos: T } | { ok: false; error: string; errores?: Record<string, string[]> };
-
-/**
- * A business rule that belongs against one field — "that authority does not
- * exist", "you already have a contract with that number".
- *
- * Thrown rather than returned so it rolls the transaction back: these checks
- * sit between reads and writes, and returning would leave the caller to
- * remember to stop.
- */
-export class ErrorDeCampo extends Error {
-  constructor(
-    readonly campo: string,
-    mensaje: string,
-  ) {
-    super(mensaje);
-    this.name = 'ErrorDeCampo';
-  }
-}
 
 export interface ContextoAccion {
   db: TenantTransactionClient;
@@ -110,6 +95,17 @@ export function crearAccion<TEntrada, TSalida>(
     } catch (error) {
       if (error instanceof ErrorDeCampo) {
         return { ok: false, error: error.message, errores: { [error.campo]: [error.message] } };
+      }
+      // Resource scope is resolved inside the transaction, once the parent
+      // record has been read under RLS. A scoped contract manager who reaches
+      // another contract gets the same deliberately vague answer as a denied
+      // top-level action; no framework error or record detail escapes.
+      if (error instanceof ForbiddenError) {
+        logger.warn(
+          { accion: definicion.nombre, permiso: definicion.permiso, orgSlug },
+          'Acción denegada por alcance del recurso',
+        );
+        return { ok: false, error: 'No tienes permiso para hacer esto.' };
       }
       throw error;
     }

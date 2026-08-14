@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BANDAS_POR_DEFECTO,
+  bandasDesdeDesconocido,
   celdas,
   esEscala,
   nivelDe,
   nivelVigente,
+  nombreDeNivel,
+  normalizarBandas,
   puntuacion,
   reduccion,
+  sonBandasValidas,
   valorar,
   valorarResidual,
 } from './matriz';
@@ -42,7 +47,7 @@ describe('nivelDe', () => {
     // deliberado: la banda mide el producto, y encontrar las catástrofes
     // raras es cosa de filtrar por impacto, no de doblar la escala.
     expect(nivelDe(1, 5)).toBe('MEDIO');
-    expect(nivelDe(3, 5)).toBe('MUY_ALTO');
+    expect(nivelDe(3, 5)).toBe('ALTO');
   });
 
   it('es simétrica: da igual qué eje sea cuál', () => {
@@ -62,6 +67,51 @@ describe('nivelDe', () => {
     for (let i = 1; i < todas.length; i += 1) {
       expect(orden[todas[i]!.nivel]).toBeGreaterThanOrEqual(orden[todas[i - 1]!.nivel]);
     }
+  });
+});
+
+describe('bandas configurables', () => {
+  it('cubre la escala completa sin huecos ni solapamientos', () => {
+    expect(sonBandasValidas(BANDAS_POR_DEFECTO)).toBe(true);
+    expect(
+      sonBandasValidas([
+        { nivel: 'BAJO', nombre: 'Bajo', desde: 1, hasta: 4, color: '#aaa' },
+        { nivel: 'MEDIO', nombre: 'Medio', desde: 6, hasta: 9, color: '#bbb' },
+        { nivel: 'ALTO', nombre: 'Alto', desde: 10, hasta: 15, color: '#ccc' },
+        { nivel: 'MUY_ALTO', nombre: 'Muy alto', desde: 16, hasta: 25, color: '#ddd' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('permite que un tenant mueva una frontera', () => {
+    const cauta = [
+      { nivel: 'BAJO' as const, nombre: 'Bajo', desde: 1, hasta: 3, color: '#aaa' },
+      { nivel: 'MEDIO' as const, nombre: 'Medio', desde: 4, hasta: 7, color: '#bbb' },
+      { nivel: 'ALTO' as const, nombre: 'Alto', desde: 8, hasta: 12, color: '#ccc' },
+      { nivel: 'MUY_ALTO' as const, nombre: 'Muy alto', desde: 13, hasta: 25, color: '#ddd' },
+    ];
+
+    expect(nivelDe(2, 2)).toBe('BAJO');
+    expect(nivelDe(2, 2, cauta)).toBe('MEDIO');
+  });
+
+  it('rechaza una configuración rota y cae al valor seguro', () => {
+    const rota = [
+      { nivel: 'BAJO' as const, nombre: 'Bajo', desde: 1, hasta: 25, color: '#aaa' },
+    ];
+    expect(normalizarBandas(rota)).toBe(BANDAS_POR_DEFECTO);
+    expect(nivelDe(5, 5, rota)).toBe('MUY_ALTO');
+  });
+
+  it('recupera nombres del snapshot sin confiar en JSON mal formado', () => {
+    const personalizada = BANDAS_POR_DEFECTO.map((banda) => ({
+      ...banda,
+      nombre: banda.nivel === 'MUY_ALTO' ? 'Crítico' : banda.nombre,
+    }));
+    const restaurada = bandasDesdeDesconocido(personalizada);
+
+    expect(nombreDeNivel('MUY_ALTO', restaurada)).toBe('Crítico');
+    expect(bandasDesdeDesconocido([{ nivel: 'BAJO' }])).toBe(BANDAS_POR_DEFECTO);
   });
 });
 

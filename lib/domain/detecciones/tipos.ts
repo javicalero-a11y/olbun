@@ -1,11 +1,12 @@
 import type {
-  CategoriaRiesgo,
   GravedadIncidencia,
   Jurisdiccion,
   TipoDeteccion,
   TipoExpediente,
   TipoIncidencia,
 } from '@prisma/client';
+
+import type { ClaveCategoriaRiesgo } from '@/lib/domain/riesgos/categorias';
 
 /**
  * The catalogue of things worth spotting in correspondence (SPEC §4.4).
@@ -52,7 +53,7 @@ export interface DefinicionTipo {
   /** For `INCIDENCIA`, what kind of incident and how serious to open it as. */
   incidencia?: { tipo: TipoIncidencia; gravedad: GravedadIncidencia };
   /** For `RIESGO`, which family of the register it belongs to. */
-  riesgo?: { categoria: CategoriaRiesgo };
+  riesgo?: { categoria: ClaveCategoriaRiesgo };
   /** What the engine should look for. Goes into the prompt verbatim. */
   senales: string;
 }

@@ -1,6 +1,17 @@
 import 'server-only';
 
+import type { Prisma } from '@prisma/client';
+
 import type { TenantTransactionClient } from '@/lib/db/tenant';
+import { hoyEn, type FechaCivil } from '@/lib/domain/fecha';
+import {
+  normalizarBandas,
+  valorar,
+  type BandaMatriz,
+  type Escala,
+} from '@/lib/domain/riesgos/matriz';
+import { proximaRevisionDesde } from '@/lib/domain/riesgos/ciclo';
+import { ErrorDeCampo } from '@/lib/services/error-de-campo';
 
 /**
  * The risk register and the incident log (SPEC §4.6, M10).
@@ -34,6 +45,59 @@ export async function siguienteReferenciaDe(
   return `${completo}${String(siguiente).padStart(4, '0')}`;
 }
 
+function aDate(fecha: FechaCivil): Date {
+  return new Date(`${fecha}T00:00:00.000Z`);
+}
+
+export async function cargarBandasRiesgo(
+  db: TenantTransactionClient,
+): Promise<readonly BandaMatriz[]> {
+  const filas = await db.bandaRiesgo.findMany({
+    where: { deletedAt: null },
+    select: {
+      nivel: true,
+      nombre: true,
+      puntuacionMinima: true,
+      puntuacionMaxima: true,
+      color: true,
+    },
+    orderBy: { orden: 'asc' },
+  });
+
+  return normalizarBandas(
+    filas.map((fila) => ({
+      nivel: fila.nivel,
+      nombre: fila.nombre,
+      desde: fila.puntuacionMinima,
+      hasta: fila.puntuacionMaxima,
+      color: fila.color,
+    })),
+  );
+}
+
+export async function categoriaRiesgoPorClave(
+  db: TenantTransactionClient,
+  clave: string,
+): Promise<{ id: string; clave: string }> {
+  const categoria = await db.categoriaRiesgo.findFirst({
+    where: { clave, isActive: true, deletedAt: null },
+    select: { id: true, clave: true },
+  });
+  if (categoria) return categoria;
+
+  const operativa = await db.categoriaRiesgo.findFirst({
+    where: { clave: 'OPERATIVO', isActive: true, deletedAt: null },
+    select: { id: true, clave: true },
+  });
+  if (!operativa) {
+    throw new ErrorDeCampo(
+      'categoriaId',
+      'La organización no tiene una categoría de riesgo activa.',
+    );
+  }
+  return operativa;
+}
+
 export interface CrearIncidenciaDatos {
   tipo: string;
   gravedad: string;
@@ -52,6 +116,13 @@ export async function crearIncidencia(
   organisationId: string,
   datos: CrearIncidenciaDatos,
 ): Promise<{ id: string; referencia: string }> {
+  if (datos.contratoId) {
+    const contrato = await db.contrato.findFirst({
+      where: { id: datos.contratoId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!contrato) throw new ErrorDeCampo('contratoId', 'Ese contrato ya no existe.');
+  }
   const referencia = await siguienteReferenciaDe(
     async (prefijo) => {
       const ultima = await db.incidencia.findFirst({
@@ -88,15 +159,16 @@ export async function crearIncidencia(
 }
 
 export interface CrearRiesgoDatos {
-  categoria: string;
+  categoriaId: string;
   causa: string;
   evento: string;
   consecuencia: string;
   probabilidadInherente: number;
   impactoInherente: number;
   respuesta?: string | undefined;
-  controles?: string | undefined;
   contratoId?: string | undefined;
+  responsableId?: string | undefined;
+  frecuenciaRevisionDias?: number | undefined;
   proximaRevision?: Date | undefined;
   deteccionId?: string | undefined;
   creadoPorId: string;
@@ -106,7 +178,32 @@ export async function crearRiesgo(
   db: TenantTransactionClient,
   organisationId: string,
   datos: CrearRiesgoDatos,
-): Promise<{ id: string; referencia: string }> {
+): Promise<{ id: string; referencia: string; nivelInherente: string }> {
+  const categoria = await db.categoriaRiesgo.findFirst({
+    where: { id: datos.categoriaId, isActive: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (!categoria) {
+    throw new ErrorDeCampo('categoriaId', 'Esa categoría ya no está disponible.');
+  }
+  if (datos.contratoId) {
+    const contrato = await db.contrato.findFirst({
+      where: { id: datos.contratoId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!contrato) throw new ErrorDeCampo('contratoId', 'Ese contrato ya no existe.');
+  }
+  if (datos.responsableId) {
+    const responsable = await db.membership.findFirst({
+      where: { userId: datos.responsableId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (!responsable) {
+      throw new ErrorDeCampo('responsableId', 'La persona responsable ya no está activa.');
+    }
+  }
+  const bandas = await cargarBandasRiesgo(db);
+  const frecuenciaRevisionDias = datos.frecuenciaRevisionDias ?? 90;
   const referencia = await siguienteReferenciaDe(
     async (prefijo) => {
       const ultima = await db.riesgo.findFirst({
@@ -120,23 +217,49 @@ export async function crearRiesgo(
     new Date().getUTCFullYear(),
   );
 
-  return db.riesgo.create({
+  const riesgo = await db.riesgo.create({
     data: {
       organisationId,
       referencia,
-      categoria: datos.categoria as never,
+      categoriaId: categoria.id,
       causa: datos.causa,
       evento: datos.evento,
       consecuencia: datos.consecuencia,
       probabilidadInherente: datos.probabilidadInherente,
       impactoInherente: datos.impactoInherente,
       respuesta: (datos.respuesta ?? 'MITIGAR') as never,
-      controles: datos.controles ?? null,
       contratoId: datos.contratoId ?? null,
-      proximaRevision: datos.proximaRevision ?? null,
+      responsableId: datos.responsableId ?? null,
+      frecuenciaRevisionDias,
+      proximaRevision:
+        datos.proximaRevision ??
+        aDate(proximaRevisionDesde(hoyEn('Europe/Madrid'), frecuenciaRevisionDias)),
       deteccionId: datos.deteccionId ?? null,
       createdById: datos.creadoPorId,
     },
     select: { id: true, referencia: true },
   });
+
+  const inherente = valorar(
+    datos.probabilidadInherente as Escala,
+    datos.impactoInherente as Escala,
+    bandas,
+  );
+  await db.valoracionRiesgo.create({
+    data: {
+      organisationId,
+      riesgoId: riesgo.id,
+      tipo: 'INICIAL',
+      probabilidadInherente: inherente.probabilidad,
+      impactoInherente: inherente.impacto,
+      puntuacionInherente: inherente.puntuacion,
+      nivelInherente: inherente.nivel,
+      justificacion: 'Valoración inherente registrada al identificar el riesgo.',
+      bandas: bandas.map((banda) => ({ ...banda })) as Prisma.InputJsonValue,
+      valoradaPorId: datos.creadoPorId,
+      createdById: datos.creadoPorId,
+    },
+  });
+
+  return { ...riesgo, nivelInherente: inherente.nivel };
 }

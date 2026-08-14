@@ -76,19 +76,95 @@ test.describe('Incidencias', () => {
 
     await expect(page.getByText('Cuenta qué pasó')).toBeVisible();
   });
+
+  test('investiga, notifica y cierra una incidencia con una acción', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/incidencias`);
+
+    await page.getByLabel('Tipo').selectOption('SEGURIDAD_DATOS');
+    await page.getByLabel('Gravedad').selectOption('GRAVE');
+    await page.getByLabel('Fecha del hecho').fill('2026-08-13');
+    await page
+      .getByLabel('Qué pasó')
+      .fill('Un parte interno llegó a una dirección externa que no era destinataria.');
+    await page.getByLabel('Hay que comunicarlo a una autoridad').check();
+    await page.getByRole('button', { name: 'Registrar incidencia' }).click();
+    await expect(page.getByRole('status')).toContainText('INC-2026-0001 registrada');
+
+    await page.reload();
+    await page.getByRole('link', { name: 'INC-2026-0001' }).click();
+    await expect(page.getByRole('heading', { name: 'Seguridad de datos' })).toBeVisible();
+
+    await page.getByLabel('Estado').selectOption('CERRADA');
+    await page
+      .getByLabel('Causa raíz')
+      .fill('La libreta de direcciones conservaba un contacto externo con nombre similar.');
+    await page
+      .getByLabel('Lecciones aprendidas')
+      .fill('Los destinatarios externos se validarán con una segunda confirmación.');
+    await page.getByLabel('Notificada a la autoridad competente').check();
+    await page.getByLabel('Referencia de Delt@, AEPD u organismo').fill('AEPD-DEMO-2026-117');
+    await page.getByRole('button', { name: 'Cerrar incidencia' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'actualizada' })).toContainText(
+      'CERRADA',
+    );
+
+    await page.getByLabel('Título', { exact: true }).fill('Revisar destinatarios externos');
+    await page
+      .getByLabel('Resultado esperado')
+      .fill('Bloquear envíos externos que no hayan recibido una segunda confirmación.');
+    await page.getByRole('button', { name: 'Crear acción' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Acción' })).toContainText(
+      'Revisar destinatarios externos',
+    );
+
+    await page.reload();
+    await expect(page.getByText('AEPD-DEMO-2026-117')).toBeVisible();
+    await expect(page.getByText('Revisar destinatarios externos')).toBeVisible();
+  });
 });
 
 test.describe('Riesgos', () => {
+  test('el administrador adapta categorías y umbrales a su empresa', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/ajustes/riesgos`);
+
+    await expect(page.getByRole('heading', { name: 'Matriz 5 × 5' })).toBeVisible();
+    await page.getByLabel('Clave estable').fill('Suministro crítico');
+    await page.getByLabel('Nombre visible').fill('Suministro crítico');
+    await page.getByRole('button', { name: 'Crear categoría' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Suministro crítico' }),
+    ).toBeVisible();
+
+    await page.getByLabel('Puntuación máxima del nivel Bajo').fill('3');
+    await page.getByLabel('Puntuación máxima del nivel Medio').fill('8');
+    await page.getByLabel('Puntuación máxima del nivel Alto').fill('14');
+    await page.getByLabel('Nombre del nivel MUY_ALTO').fill('Crítico');
+    await page.getByRole('button', { name: 'Guardar matriz' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Matriz de riesgo' }),
+    ).toBeVisible();
+
+    await page.goto(`/${cred.slug}/riesgos`);
+    await expect(
+      page.getByLabel('Categoría').getByRole('option', { name: 'Suministro crítico' }),
+    ).toBeAttached();
+    await page.getByLabel('Probabilidad', { exact: true }).selectOption('3');
+    await page.getByLabel('Impacto', { exact: true }).selectOption('5');
+    await expect(page.getByRole('status')).toContainText('Crítico · 15');
+  });
+
   test('el nivel se calcula mientras se puntúa, antes de guardar', async ({ page }) => {
     const cred = await registrar(page);
     await page.goto(`/${cred.slug}/riesgos`);
 
-    await page.getByLabel('Probabilidad').selectOption('5');
-    await page.getByLabel('Impacto').selectOption('5');
+    await page.getByLabel('Probabilidad', { exact: true }).selectOption('5');
+    await page.getByLabel('Impacto', { exact: true }).selectOption('5');
     await expect(page.getByRole('status')).toContainText('Muy alto · 25');
 
-    await page.getByLabel('Probabilidad').selectOption('1');
-    await page.getByLabel('Impacto').selectOption('2');
+    await page.getByLabel('Probabilidad', { exact: true }).selectOption('1');
+    await page.getByLabel('Impacto', { exact: true }).selectOption('2');
     await expect(page.getByRole('status')).toContainText('Bajo · 2');
   });
 
@@ -96,12 +172,12 @@ test.describe('Riesgos', () => {
     const cred = await registrar(page);
     await page.goto(`/${cred.slug}/riesgos`);
 
-    await page.getByLabel('Categoría').selectOption('CONTRACTUAL');
+    await page.getByLabel('Categoría').selectOption({ label: 'Contractual' });
     await page.getByLabel('Porque…').fill('la plantilla adscrita está por debajo del pliego');
     await page.getByLabel('puede ocurrir que…').fill('el órgano lo detecte en una inspección');
     await page.getByLabel('con la consecuencia de que…').fill('se imponga una penalidad');
-    await page.getByLabel('Probabilidad').selectOption('4');
-    await page.getByLabel('Impacto').selectOption('4');
+    await page.getByLabel('Probabilidad', { exact: true }).selectOption('4');
+    await page.getByLabel('Impacto', { exact: true }).selectOption('4');
     await page.getByRole('button', { name: 'Añadir al registro' }).click();
 
     await expect(page.getByRole('status').first()).toContainText('RSG-');
@@ -112,6 +188,78 @@ test.describe('Riesgos', () => {
     // Nadie ha valorado todavía qué queda después de los controles, y el
     // registro lo dice en vez de dar por hecho que están puestos.
     await expect(fila).toContainText('Sin valorar el residual');
+
+    await page.getByRole('link', { name: /Probabilidad 4, impacto 4: 1 riesgos/ }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Filtro activo' })).toContainText(
+      'probabilidad 4, impacto 4',
+    );
+    await expect(
+      page.getByRole('row').filter({ hasText: 'el órgano lo detecte' }),
+    ).toBeVisible();
+  });
+
+  test('control, revaloración y acción dejan un historial visible', async ({ page }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/riesgos`);
+
+    await page.getByLabel('Porque…').fill('los partes se revisan sólo al cierre del mes');
+    await page
+      .getByLabel('puede ocurrir que…')
+      .fill('una desviación diaria no se detecte a tiempo');
+    await page
+      .getByLabel('con la consecuencia de que…')
+      .fill('se acumule un incumplimiento contractual');
+    await page.getByLabel('Probabilidad', { exact: true }).selectOption('4');
+    await page.getByLabel('Impacto', { exact: true }).selectOption('4');
+    await page.getByRole('button', { name: 'Añadir al registro' }).click();
+    await expect(page.getByRole('status').first()).toContainText('RSG-');
+
+    await page.reload();
+    await page
+      .getByRole('link', { name: 'una desviación diaria no se detecte a tiempo' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'una desviación diaria no se detecte a tiempo' }),
+    ).toBeVisible();
+
+    await page.getByLabel('Nombre').fill('Revisión diaria del parte');
+    await page
+      .getByLabel('Cómo funciona')
+      .fill('El supervisor compara rutas, horas y evidencias antes de validar el parte.');
+    await page.getByLabel('Eficacia').selectOption('PARCIAL');
+    await page.getByRole('button', { name: 'Guardar control' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'registrado' })).toContainText(
+      'Revisión diaria del parte',
+    );
+
+    await page.getByLabel('Probabilidad residual').selectOption('2');
+    await page.getByLabel('Impacto residual').selectOption('3');
+    await page
+      .getByLabel('Comprobaciones y justificación')
+      .fill(
+        'Se probaron siete partes consecutivos y el control detectó todas las desviaciones.',
+      );
+    await page.getByLabel('Siguiente revisión').fill('2026-12-01');
+    await page.getByRole('button', { name: 'Guardar revisión' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'sin alterar el histórico' }),
+    ).toBeVisible();
+
+    await page.getByLabel('Título', { exact: true }).fill('Automatizar la comparación diaria');
+    await page
+      .getByLabel('Resultado esperado')
+      .fill('El sistema señalará toda ruta sin evidencia antes de cerrar el turno.');
+    await page.getByLabel('Prioridad').selectOption('ALTA');
+    await page.getByRole('button', { name: 'Crear acción' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Acción' })).toContainText(
+      'Automatizar la comparación diaria',
+    );
+
+    await page.reload();
+    await expect(page.getByText('Residual', { exact: true })).toBeVisible();
+    await expect(page.getByText(/residual 6 \(Medio\)/)).toBeVisible();
+    await expect(page.getByText('Revisión diaria del parte')).toBeVisible();
+    await expect(page.getByText('Automatizar la comparación diaria')).toBeVisible();
   });
 
   test('el registro de otra organización no es visible', async ({ page, browser }) => {

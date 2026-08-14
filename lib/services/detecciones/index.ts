@@ -3,8 +3,9 @@ import 'server-only';
 import { TIPOS_DETECCION } from '@/lib/domain/detecciones/tipos';
 import { verificarExtractos } from '@/lib/domain/detecciones/verificacion';
 import { abrirExpediente, aDate } from '@/lib/services/expedientes';
-import { crearIncidencia, crearRiesgo } from '@/lib/services/riesgos';
+import { categoriaRiesgoPorClave, crearIncidencia, crearRiesgo } from '@/lib/services/riesgos';
 import { hayClaveDeClaude, motorClaude } from './claude';
+import { resumenDesdeExtractos } from './extractos';
 import { logger } from '@/lib/logger';
 import { motorDeReglas } from './reglas';
 import { serverEnv } from '@/lib/env';
@@ -32,6 +33,7 @@ import type { TenantTransactionClient } from '@/lib/db/tenant';
  */
 
 export { ErrorMotor } from './motor';
+export { descartarDeteccion } from './descartar';
 export type { MotorDeteccion } from './motor';
 
 /**
@@ -297,8 +299,12 @@ export async function confirmarDeteccion(
   // unscored beyond a placeholder — the engine has no basis for a probability,
   // and a register full of machine-invented scores is worse than an empty one.
   if (definicion.destino === 'RIESGO') {
+    const categoria = await categoriaRiesgoPorClave(
+      db,
+      definicion.riesgo?.categoria ?? 'OPERATIVO',
+    );
     const riesgo = await crearRiesgo(db, organisationId, {
-      categoria: definicion.riesgo?.categoria ?? 'OPERATIVO',
+      categoriaId: categoria.id,
       causa: `Detectado en «${deteccion.comunicacion.asunto}»`,
       evento: definicion.etiqueta,
       consecuencia: cita ?? definicion.descripcion,
@@ -383,35 +389,6 @@ export async function confirmarDeteccion(
   };
 }
 
-export async function descartarDeteccion(
-  db: TenantTransactionClient,
-  datos: { deteccionId: string; revisorId: string; motivo: string },
-): Promise<{ tipo: string }> {
-  const deteccion = await db.deteccion.findFirst({
-    where: { id: datos.deteccionId, deletedAt: null },
-    select: { id: true, tipo: true, estado: true },
-  });
-
-  if (!deteccion) throw new Error('La detección no existe.');
-  if (deteccion.estado === 'CONVERTIDA') {
-    throw new Error('No se puede descartar una detección ya convertida en expediente.');
-  }
-
-  await db.deteccion.update({
-    where: { id: deteccion.id },
-    data: {
-      estado: 'DESCARTADA',
-      // The reviewer's id is what tells a later re-analysis to leave this
-      // alone. An automatic discard has none.
-      revisadaPorId: datos.revisorId,
-      revisadaEn: new Date(),
-      motivoDescarte: datos.motivo,
-    },
-  });
-
-  return { tipo: deteccion.tipo };
-}
-
 async function marcarRevisada(
   db: TenantTransactionClient,
   comunicacionId: string,
@@ -420,12 +397,4 @@ async function marcarRevisada(
     where: { id: comunicacionId },
     data: { estadoRevision: 'REVISADA' },
   });
-}
-
-/** The verified quote makes a better summary than anything we could compose. */
-function resumenDesdeExtractos(extractos: unknown): string | undefined {
-  if (!Array.isArray(extractos)) return undefined;
-
-  const primero = extractos[0] as { texto?: unknown } | undefined;
-  return typeof primero?.texto === 'string' ? primero.texto : undefined;
 }

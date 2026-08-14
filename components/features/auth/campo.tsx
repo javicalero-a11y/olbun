@@ -12,9 +12,18 @@ interface CampoProps extends React.InputHTMLAttributes<HTMLInputElement> {
  * is referenced by `aria-describedby` and announced politely, and the field is
  * marked `aria-invalid` so it is not signalled by colour alone (SPEC §8).
  */
-export function Campo({ etiqueta, nombre, errores, ayuda, className, ...props }: CampoProps) {
-  const errorId = `${nombre}-error`;
-  const ayudaId = `${nombre}-ayuda`;
+export function Campo({
+  etiqueta,
+  nombre,
+  errores,
+  ayuda,
+  className,
+  id,
+  ...props
+}: CampoProps) {
+  const inputId = id ?? nombre;
+  const errorId = `${inputId}-error`;
+  const ayudaId = `${inputId}-ayuda`;
   const invalido = Boolean(errores?.length);
 
   const describedBy = [ayuda ? ayudaId : null, invalido ? errorId : null]
@@ -23,12 +32,12 @@ export function Campo({ etiqueta, nombre, errores, ayuda, className, ...props }:
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={nombre} className="block text-sm font-medium">
+      <label htmlFor={inputId} className="block text-sm font-medium">
         {etiqueta}
       </label>
 
       <input
-        id={nombre}
+        id={inputId}
         name={nombre}
         aria-invalid={invalido}
         aria-describedby={describedBy || undefined}

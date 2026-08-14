@@ -124,6 +124,11 @@ model Organisation {
   detecciones           Deteccion[]
   incidencias           Incidencia[]
   riesgos               Riesgo[]
+  bandasRiesgo          BandaRiesgo[]
+  categoriasRiesgo      CategoriaRiesgo[]
+  controlesRiesgo       ControlRiesgo[]
+  valoracionesRiesgo    ValoracionRiesgo[]
+  revisionesRiesgo      RevisionRiesgo[]
   accionesCorrectoras   AccionCorrectora[]
   tiposDocumento        TipoDocumento[]
   documentos            Documento[]
@@ -1468,20 +1473,26 @@ model Incidencia {
   fechaHecho        DateTime
   fechaComunicacion DateTime?
 
-  lugar             String?
-  descripcion       String
-  medidasInmediatas String?
+  lugar               String?
+  descripcion         String
+  medidasInmediatas   String?
+  causaRaiz           String?
+  leccionesAprendidas String?
+  fechaCierre         DateTime? @db.Date
 
   /// JSONB, encrypted by the application. Null until M11 provides the key.
   personasImplicadas Json?
 
   /// Told the contracting authority. A penalty for late notice usually turns
   /// on this and its date.
-  comunicadaAlOrgano      Boolean   @default(false)
-  fechaComunicacionOrgano DateTime?
+  comunicadaAlOrgano         Boolean   @default(false)
+  fechaComunicacionOrgano    DateTime?
   /// Reportable to a public authority — Delt@ for accidents, the AEPD for a
   /// data breach. A flag a person sets, never inferred.
-  esNotificableAAutoridad Boolean   @default(false)
+  esNotificableAAutoridad    Boolean   @default(false)
+  notificadaAAutoridad       Boolean   @default(false)
+  fechaNotificacionAutoridad DateTime?
+  referenciaAutoridad        String?
 
   expedienteId String?
   /// The detection this came from, when a person confirmed one.
@@ -1503,20 +1514,6 @@ model Incidencia {
   @@index([organisationId, estado, fechaHecho])
   @@index([contratoId])
   @@map("incidencias")
-}
-
-/// Where a risk sits. Kept as an enum rather than a table: these are the
-/// families a contractor's risk register actually uses, and a tenant inventing
-/// a sixteenth category is a problem we have not got yet.
-enum CategoriaRiesgo {
-  CONTRACTUAL
-  LABORAL
-  PREVENCION
-  ECONOMICO
-  OPERATIVO
-  REPUTACIONAL
-  CUMPLIMIENTO
-  PROTECCION_DATOS
 }
 
 /// How the organisation intends to deal with it. The four standard responses.
@@ -1551,8 +1548,8 @@ model Riesgo {
 
   referencia String
 
-  categoria  CategoriaRiesgo
-  contratoId String?
+  categoriaId String?
+  contratoId  String?
 
   causa        String
   evento       String
@@ -1572,10 +1569,11 @@ model Riesgo {
 
   estado EstadoRiesgo @default(IDENTIFICADO)
 
-  responsableId   String?
+  responsableId          String?
+  frecuenciaRevisionDias Int       @default(90)
   /// Risk registers rot. This is the date somebody has to look again.
-  proximaRevision DateTime? @db.Date
-  ultimaRevision  DateTime? @db.Date
+  proximaRevision        DateTime? @db.Date
+  ultimaRevision         DateTime? @db.Date
 
   /// Set when the risk stopped being hypothetical.
   incidenciaId String?
@@ -1587,25 +1585,212 @@ model Riesgo {
   createdById String?
   deletedAt   DateTime?
 
-  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  contrato     Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  incidencia   Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
-  expediente   Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
-  acciones     AccionCorrectora[]
+  organisation           Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  categoria              CategoriaRiesgo?   @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  contrato               Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  incidencia             Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+  expediente             Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  acciones               AccionCorrectora[]
+  controlesEstructurados ControlRiesgo[]
+  valoraciones           ValoracionRiesgo[]
+  revisiones             RevisionRiesgo[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado])
+  @@index([organisationId, categoriaId, estado])
   @@index([organisationId, proximaRevision])
   @@index([contratoId])
   @@map("riesgos")
 }
 
+/// Tenant-configurable taxonomy. `clave` is a stable import/detection key;
+/// `nombre` is what each organisation shows to its users.
+model CategoriaRiesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  clave       String
+  nombre      String
+  descripcion String?
+  color       String
+  orden       Int
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  riesgos      Riesgo[]
+
+  @@unique([organisationId, clave])
+  @@unique([organisationId, nombre])
+  @@index([organisationId, isActive, orden])
+  @@map("categorias_riesgo")
+}
+
+enum NivelMatrizRiesgo {
+  BAJO
+  MEDIO
+  ALTO
+  MUY_ALTO
+}
+
+/// Tenant-owned risk bands. The 5x5 inputs stay stable while each organisation
+/// may tune which products fall into each named band.
+model BandaRiesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nivel            NivelMatrizRiesgo
+  nombre           String
+  puntuacionMinima Int
+  puntuacionMaxima Int
+  color            String
+  orden            Int
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, nivel])
+  @@index([organisationId, orden])
+  @@map("bandas_riesgo")
+}
+
+enum TipoControlRiesgo {
+  PREVENTIVO
+  DETECTIVO
+  CORRECTIVO
+  DIRECTIVO
+}
+
+enum EficaciaControlRiesgo {
+  NO_EVALUADO
+  INEFICAZ
+  PARCIAL
+  EFICAZ
+}
+
+/// A named control whose existence and effectiveness can be reviewed instead
+/// of disappearing inside a free-text risk description.
+model ControlRiesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+  riesgoId       String
+
+  titulo      String
+  descripcion String
+  tipo        TipoControlRiesgo
+  eficacia    EficaciaControlRiesgo @default(NO_EVALUADO)
+  esExistente Boolean               @default(true)
+
+  responsableId String?
+  ultimaPrueba  DateTime? @db.Date
+  proximaPrueba DateTime? @db.Date
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  riesgo       Riesgo       @relation(fields: [riesgoId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, riesgoId, deletedAt])
+  @@index([organisationId, eficacia])
+  @@map("controles_riesgo")
+}
+
+enum TipoValoracionRiesgo {
+  INICIAL
+  REVISION
+  REVALORACION
+}
+
+/// Immutable scoring snapshot. If a score was wrong, a compensating snapshot
+/// is appended; history is never rewritten (ADR 0003).
+model ValoracionRiesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+  riesgoId       String
+
+  tipo TipoValoracionRiesgo
+
+  probabilidadInherente Int
+  impactoInherente      Int
+  puntuacionInherente   Int
+  nivelInherente        NivelMatrizRiesgo
+
+  probabilidadResidual Int?
+  impactoResidual      Int?
+  puntuacionResidual   Int?
+  nivelResidual        NivelMatrizRiesgo?
+
+  justificacion String
+  bandas        Json
+  valoradaEn    DateTime @default(now())
+  valoradaPorId String
+
+  createdAt   DateTime @default(now())
+  createdById String
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  riesgo       Riesgo       @relation(fields: [riesgoId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, riesgoId, valoradaEn])
+  @@map("valoraciones_riesgo")
+}
+
+enum ResultadoRevisionRiesgo {
+  SIN_CAMBIOS
+  REVALORADO
+  CONTROL_ACTUALIZADO
+  MATERIALIZADO
+  CERRADO
+}
+
+/// Immutable evidence that somebody reviewed the risk on its due date.
+model RevisionRiesgo {
+  id             String @id @default(cuid(2))
+  organisationId String
+  riesgoId       String
+
+  resultado       ResultadoRevisionRiesgo
+  comentarios     String
+  revisadaEn      DateTime                @default(now())
+  revisadaPorId   String
+  proximaRevision DateTime?               @db.Date
+
+  createdAt   DateTime @default(now())
+  createdById String
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  riesgo       Riesgo       @relation(fields: [riesgoId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, riesgoId, revisadaEn])
+  @@index([organisationId, proximaRevision])
+  @@map("revisiones_riesgo")
+}
+
 enum EstadoAccion {
   PENDIENTE
   EN_CURSO
+  BLOQUEADA
   COMPLETADA
   VERIFICADA
   CANCELADA
+}
+
+enum PrioridadAccion {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
 }
 
 /// What somebody committed to do about it (SPEC §12, M10).
@@ -1624,8 +1809,12 @@ model AccionCorrectora {
   incidenciaId String?
   riesgoId     String?
 
-  descripcion String
-  estado      EstadoAccion @default(PENDIENTE)
+  titulo        String          @default("Acción correctora")
+  descripcion   String
+  estado        EstadoAccion    @default(PENDIENTE)
+  prioridad     PrioridadAccion @default(MEDIA)
+  progreso      Int             @default(0)
+  motivoBloqueo String?
 
   responsableId String?
   fechaLimite   DateTime? @db.Date

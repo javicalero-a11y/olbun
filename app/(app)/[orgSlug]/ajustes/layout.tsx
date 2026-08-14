@@ -22,6 +22,11 @@ export default async function AjustesLayout({
       texto: 'Auditoría',
       visible: can(actor, 'audit:view'),
     },
+    {
+      href: `/${orgSlug}/ajustes/riesgos`,
+      texto: 'Riesgos',
+      visible: can(actor, 'settings:manage'),
+    },
   ].filter((s) => s.visible);
 
   return (

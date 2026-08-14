@@ -6,25 +6,14 @@ import type { EstadoRiesgos } from '@/app/(app)/[orgSlug]/riesgos/acciones';
 import { BotonEnviar, ErrorGeneral } from '@/components/features/auth/campo';
 import {
   ETIQUETA_IMPACTO,
-  ETIQUETA_NIVEL,
   ETIQUETA_PROBABILIDAD,
   nivelDe,
+  nombreDeNivel,
   puntuacion,
 } from '@/lib/domain/riesgos/matriz';
-import type { Escala } from '@/lib/domain/riesgos/matriz';
+import type { BandaMatriz, Escala } from '@/lib/domain/riesgos/matriz';
 
 const INICIAL: EstadoRiesgos = {};
-
-const CATEGORIAS = [
-  { valor: 'CONTRACTUAL', etiqueta: 'Contractual' },
-  { valor: 'LABORAL', etiqueta: 'Laboral' },
-  { valor: 'PREVENCION', etiqueta: 'Prevención' },
-  { valor: 'ECONOMICO', etiqueta: 'Económico' },
-  { valor: 'OPERATIVO', etiqueta: 'Operativo' },
-  { valor: 'REPUTACIONAL', etiqueta: 'Reputacional' },
-  { valor: 'CUMPLIMIENTO', etiqueta: 'Cumplimiento' },
-  { valor: 'PROTECCION_DATOS', etiqueta: 'Protección de datos' },
-];
 
 const RESPUESTAS = [
   { valor: 'MITIGAR', etiqueta: 'Mitigar' },
@@ -55,15 +44,21 @@ export const CLASE_NIVEL: Record<string, string> = {
 export function FormularioRiesgo({
   accion,
   contratos,
+  categorias,
+  responsables,
+  bandas,
 }: {
   accion: (previo: EstadoRiesgos, formData: FormData) => Promise<EstadoRiesgos>;
   contratos: { id: string; etiqueta: string }[];
+  categorias: { id: string; nombre: string }[];
+  responsables: { id: string; nombre: string }[];
+  bandas: readonly BandaMatriz[];
 }) {
   const [estado, enviar, pendiente] = useActionState(accion, INICIAL);
   const [probabilidad, setProbabilidad] = useState<Escala>(3);
   const [impacto, setImpacto] = useState<Escala>(3);
 
-  const nivel = nivelDe(probabilidad, impacto);
+  const nivel = nivelDe(probabilidad, impacto, bandas);
 
   return (
     <form action={enviar} className="space-y-4 rounded-lg border border-border p-4">
@@ -80,18 +75,19 @@ export function FormularioRiesgo({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label htmlFor="categoria" className="block text-sm font-medium">
+          <label htmlFor="categoriaId" className="block text-sm font-medium">
             Categoría
           </label>
           <select
-            id="categoria"
-            name="categoria"
-            defaultValue="CONTRACTUAL"
+            id="categoriaId"
+            name="categoriaId"
+            defaultValue={categorias[0]?.id}
+            required
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
-            {CATEGORIAS.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
+            {categorias.map((opcion) => (
+              <option key={opcion.id} value={opcion.id}>
+                {opcion.nombre}
               </option>
             ))}
           </select>
@@ -212,42 +208,68 @@ export function FormularioRiesgo({
             role="status"
             className={`rounded-md border border-border px-3 py-2 text-sm ${CLASE_NIVEL[nivel] ?? ''}`}
           >
-            {ETIQUETA_NIVEL[nivel]} · {String(puntuacion(probabilidad, impacto))}
+            {nombreDeNivel(nivel, bandas)} · {String(puntuacion(probabilidad, impacto))}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <label htmlFor="respuesta" className="block text-sm font-medium">
-            Respuesta
-          </label>
-          <select
-            id="respuesta"
-            name="respuesta"
-            defaultValue="MITIGAR"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            {RESPUESTAS.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
-              </option>
-            ))}
-          </select>
+      <details className="rounded-md border border-border px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium">Responsable y revisión</summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <label htmlFor="respuesta" className="block text-sm font-medium">
+              Respuesta
+            </label>
+            <select
+              id="respuesta"
+              name="respuesta"
+              defaultValue="MITIGAR"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {RESPUESTAS.map((opcion) => (
+                <option key={opcion.valor} value={opcion.valor}>
+                  {opcion.etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="responsableId" className="block text-sm font-medium">
+              Responsable
+            </label>
+            <select
+              id="responsableId"
+              name="responsableId"
+              defaultValue=""
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Sin asignar</option>
+              {responsables.map((persona) => (
+                <option key={persona.id} value={persona.id}>
+                  {persona.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="frecuenciaRevisionDias" className="block text-sm font-medium">
+              Revisar cada
+            </label>
+            <select
+              id="frecuenciaRevisionDias"
+              name="frecuenciaRevisionDias"
+              defaultValue="90"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="30">30 días</option>
+              <option value="60">60 días</option>
+              <option value="90">90 días</option>
+              <option value="180">180 días</option>
+              <option value="365">365 días</option>
+            </select>
+          </div>
         </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="controles" className="block text-sm font-medium">
-            Controles
-          </label>
-          <input
-            id="controles"
-            name="controles"
-            type="text"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+      </details>
 
       <BotonEnviar pendiente={pendiente}>Añadir al registro</BotonEnviar>
     </form>

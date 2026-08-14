@@ -4,6 +4,7 @@ import type { Role } from '@prisma/client';
 
 import { identityClientBecause } from '@/lib/db/tenant';
 import { sembrarPlantillasDelSistema } from './plantillas';
+import { sembrarConfiguracionRiesgos } from './configuracion-riesgos';
 import { uniqueSlug } from '@/lib/domain/slug';
 import { logger } from '@/lib/logger';
 
@@ -182,6 +183,7 @@ export async function crearOrganizacionPara(
     });
 
     await sembrarPlantillasDelSistema(tx, organisation.id);
+    await sembrarConfiguracionRiesgos(tx, organisation.id);
 
     const nombre = datos.nombre?.trim();
     if (nombre) {

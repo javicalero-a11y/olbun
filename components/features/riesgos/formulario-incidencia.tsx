@@ -29,9 +29,9 @@ const GRAVEDADES = [
 /**
  * Reporting what happened.
  *
- * Two kinds of incident start a legal clock the moment they occur — an
- * accident and a data breach — so the form says so next to the checkbox
- * instead of leaving somebody to remember it.
+ * Accidents and data breaches can activate external reporting duties. The
+ * interface raises the question without inferring a deadline or legal duty;
+ * PRL or the DPD must confirm the concrete case.
  */
 export function FormularioIncidencia({
   accion,
@@ -191,7 +191,7 @@ export function FormularioIncidencia({
           </label>
           <p id="notificable-ayuda" className="text-xs text-muted-foreground">
             {puedeSerNotificable
-              ? 'Un accidente con baja va a Delt@ en 5 días hábiles; una brecha de datos, a la AEPD en 72 horas. El plazo corre desde que pasó, no desde hoy.'
+              ? 'Puede activar plazos diferentes ante Delt@ o la AEPD. Registra cuándo se conoció y valida el deber concreto con PRL o el DPD; Olbun no lo presume.'
               : 'Márcalo si algún organismo tiene que enterarse. Nadie lo deduce por ti.'}
           </p>
         </div>

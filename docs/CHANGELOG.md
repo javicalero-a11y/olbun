@@ -4,6 +4,37 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M10 — Riesgos e incidencias (completo, 2026-08-14)
+
+- Registro vivo ordenado por exposición vigente y matriz interactiva 5×5 con
+  enlaces a cada celda. El residual sólo sustituye al inherente cuando una
+  persona lo ha valorado; «sin valorar» nunca se disfraza de control eficaz.
+- Categorías y cuatro bandas configurables por organización, con pantalla de
+  administración, validación de cobertura 1–25 y auditoría. Cada alta recibe
+  nueve categorías útiles y una matriz coherente.
+- Valoraciones y revisiones periódicas inmutables mediante triggers de sólo
+  inserción. Cada snapshot conserva la matriz aplicada, de modo que cambiar un
+  umbral no reescribe el significado del histórico.
+- Riesgo redactado como causa → evento → consecuencia, responsable, respuesta,
+  cadencia y fecha de revisión. El detalle explica inherente, residual,
+  reducción, controles y evolución.
+- Controles preventivos, detectivos, correctivos y directivos con eficacia y
+  fechas de prueba. Acciones correctoras con prioridad, responsable, progreso,
+  bloqueo, cierre y verificación de eficacia.
+- Incidencias con investigación, causa raíz, lecciones, comunicación al órgano
+  y referencia de notificación a autoridad. Olbun señala el trabajo pendiente,
+  pero no decide ni envía una notificación regulatoria automáticamente.
+- La confirmación de detecciones desemboca de verdad en riesgo o incidencia y
+  aplica una categoría tenant estable; todos los accesos respetan alcance de
+  contrato, RBAC, DAL tenant y RLS.
+- Demo enriquecida con 12 riesgos, 8 incidencias, controles, acciones y fechas
+  plausibles. ADR 0011 y metodología operativa documentan el modelo y sus
+  límites.
+- Las 20 migraciones pasan desde una base vacía. 1.296 pruebas unitarias e
+  integración y 152 recorridos E2E de producción —76 en escritorio y 76 en
+  móvil— quedan verdes. Cobertura: 63,89% líneas, 66,28% funciones, 53,57%
+  ramas y 63,61% sentencias; el ratchet de CI sube con el resultado.
+
 ## M9 — Documentos y evidencia (completo, 2026-08-14)
 
 - ClamAV oficial en Docker y CI. Cada versión se envía por `INSTREAM`; solo un
@@ -166,7 +197,7 @@ SPEC §12.
   expediente.
 - Queda para la siguiente tanda: antivirus, OCR de escaneados e índice en PDF.
 
-## M10 — Riesgos e incidencias (2026-08-13)
+## M10 — Riesgos e incidencias, primera entrega (2026-08-13)
 
 Cierra el cabo suelto de M7: confirmar una detección cuyo destino era una
 incidencia o un riesgo dejaba constancia de la decisión y no creaba nada. Cinco
@@ -176,8 +207,9 @@ de los catorce tipos acababan ahí.
   `AccionCorrectora`, con RLS y con las comprobaciones en la base de datos: una
   acción cuelga siempre de una incidencia o de un riesgo, y las puntuaciones
   van del 1 al 5.
-- Matriz 5×5 en `lib/domain/riesgos`: las bandas se calculan, nunca se guardan,
-  así que retocar la matriz no deja el registro incoherente consigo mismo.
+- En esta primera entrega, matriz 5×5 común calculada en
+  `lib/domain/riesgos`; el cierre de M10 la convirtió en configuración tenant y
+  empezó a conservar cada versión dentro del histórico inmutable.
 - «Sin valorar el residual» y «los controles no cambiaron nada» son cosas
   distintas y el registro las distingue. Ordena por el nivel vigente, que es el
   residual cuando existe y el inherente cuando nadie lo ha valorado.

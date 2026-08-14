@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { crear } from './acciones';
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 import { FormularioIncidencia } from '@/components/features/riesgos/formulario-incidencia';
 import { requirePermission } from '@/lib/auth/guardias';
+import { can } from '@/lib/auth/can';
+import { isScopedRole } from '@/lib/auth/permissions';
 import { tenantClient } from '@/lib/db/tenant';
 
 export const metadata: Metadata = { title: 'Incidencias' };
@@ -48,10 +51,12 @@ export default async function IncidenciasPage({
   const { orgSlug } = await params;
   const contexto = await requirePermission(orgSlug, 'incidencia:view');
   const db = tenantClient(contexto.organisation.id);
+  const conAlcance = isScopedRole(contexto.actor.role);
+  const alcance = conAlcance ? { contratoId: { in: [...contexto.actor.contratoIds] } } : {};
 
   const [incidencias, contratos] = await Promise.all([
     db.incidencia.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...alcance },
       select: {
         id: true,
         referencia: true,
@@ -62,6 +67,7 @@ export default async function IncidenciasPage({
         descripcion: true,
         esNotificableAAutoridad: true,
         comunicadaAlOrgano: true,
+        notificadaAAutoridad: true,
         contrato: { select: { numeroExpediente: true } },
         deteccionId: true,
       },
@@ -69,7 +75,10 @@ export default async function IncidenciasPage({
       take: 200,
     }),
     db.contrato.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        ...(conAlcance ? { id: { in: [...contexto.actor.contratoIds] } } : {}),
+      },
       select: { id: true, numeroExpediente: true, objeto: true },
       orderBy: { numeroExpediente: 'asc' },
     }),
@@ -86,13 +95,15 @@ export default async function IncidenciasPage({
         </p>
       </div>
 
-      <FormularioIncidencia
-        accion={crear.bind(null, orgSlug)}
-        contratos={contratos.map((contrato) => ({
-          id: contrato.id,
-          etiqueta: `${contrato.numeroExpediente} — ${contrato.objeto}`,
-        }))}
-      />
+      {can(contexto.actor, 'incidencia:create') && (!conAlcance || contratos.length > 0) ? (
+        <FormularioIncidencia
+          accion={crear.bind(null, orgSlug)}
+          contratos={contratos.map((contrato) => ({
+            id: contrato.id,
+            etiqueta: `${contrato.numeroExpediente} — ${contrato.objeto}`,
+          }))}
+        />
+      ) : null}
 
       <Tabla
         titulo="Incidencias registradas, primero las que siguen abiertas"
@@ -112,7 +123,12 @@ export default async function IncidenciasPage({
             esCabeceraDeFila: true,
             celda: (incidencia) => (
               <>
-                <span className="text-sm font-medium">{incidencia.referencia}</span>
+                <Link
+                  href={`/${orgSlug}/incidencias/${incidencia.id}`}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  {incidencia.referencia}
+                </Link>
                 <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                   {incidencia.descripcion}
                 </p>
@@ -149,8 +165,17 @@ export default async function IncidenciasPage({
                 <p className="text-muted-foreground">
                   {incidencia.comunicadaAlOrgano ? 'Comunicada al órgano' : 'Sin comunicar'}
                 </p>
+                {incidencia.notificadaAAutoridad ? (
+                  <p className="text-status-green">Autoridad notificada</p>
+                ) : null}
               </div>
             ),
+          },
+          {
+            clave: 'estado',
+            encabezado: 'Estado',
+            clase: 'text-xs',
+            celda: (incidencia) => incidencia.estado.replaceAll('_', ' '),
           },
           {
             clave: 'contrato',

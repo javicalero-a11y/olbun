@@ -81,13 +81,31 @@ test.describe('Entrar por otros medios', () => {
     await expect(page.getByText('verificación en dos pasos activada')).toBeVisible();
   });
 
-  test('en producción no ofrece proveedores sin credenciales', async ({ page }) => {
-    // Playwright runs `next build && next start`: this is the production rule.
-    // The disabled preview buttons remain covered by the provider unit tests.
+  test('en producción ofrece sólo los proveedores configurados', async ({ page }) => {
+    // CI has no provider secrets and therefore expects no buttons. A developer
+    // may deliberately have real local credentials: in that environment the
+    // same assertion verifies that each configured provider is offered.
     await page.goto('/acceso');
 
-    for (const nombre of [/Google/, /Microsoft/]) {
-      await expect(page.getByRole('button', { name: nombre })).toHaveCount(0);
+    const proveedores = [
+      {
+        nombre: /Google/,
+        configurado: Boolean(
+          process.env['GOOGLE_CLIENT_ID'] && process.env['GOOGLE_CLIENT_SECRET'],
+        ),
+      },
+      {
+        nombre: /Microsoft/,
+        configurado: Boolean(
+          process.env['MICROSOFT_CLIENT_ID'] && process.env['MICROSOFT_CLIENT_SECRET'],
+        ),
+      },
+    ];
+
+    for (const proveedor of proveedores) {
+      await expect(page.getByRole('button', { name: proveedor.nombre })).toHaveCount(
+        proveedor.configurado ? 1 : 0,
+      );
     }
   });
 });

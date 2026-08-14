@@ -11,7 +11,11 @@ export default async function AjustesPage({
   const { orgSlug } = await params;
   const { actor } = await requireSession(orgSlug);
 
-  redirect(
-    can(actor, 'user:list') ? `/${orgSlug}/ajustes/usuarios` : `/${orgSlug}/ajustes/seguridad`,
-  );
+  const destino = can(actor, 'user:list')
+    ? 'usuarios'
+    : can(actor, 'settings:manage')
+      ? 'riesgos'
+      : 'seguridad';
+
+  redirect(`/${orgSlug}/ajustes/${destino}`);
 }
