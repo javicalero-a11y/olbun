@@ -28,15 +28,15 @@ test.describe('M0 smoke', () => {
     expect(headers['x-powered-by']).toBeUndefined();
   });
 
-  test('the production server sends HSTS and upgrades insecure requests', async ({
+  test('a plaintext production preview does not force unavailable HTTPS', async ({
     request,
   }) => {
-    // Playwright starts the built server. Development-only absence is covered
-    // by next.config's isDev branch and does not belong in this production E2E.
+    // `next start` is production mode, but the local and LAN demos intentionally
+    // serve HTTP. Enabling either directive here breaks Safari and all assets.
     const response = await request.get('/');
     const headers = response.headers();
 
-    expect(headers['strict-transport-security']).toContain('max-age=63072000');
-    expect(headers['content-security-policy']).toContain('upgrade-insecure-requests');
+    expect(headers['strict-transport-security']).toBeUndefined();
+    expect(headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
   });
 });

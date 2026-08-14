@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-14 — Corrección de la demo LAN
+
+- Las cabeceras HSTS y `upgrade-insecure-requests` ahora dependen del protocolo
+  público configurado, no solo de `NODE_ENV`. La demo de producción por HTTP en
+  red local vuelve a cargar estilos y ya no redirige Safari a un HTTPS inexistente.
+- Los despliegues reales con `APP_URL=https://…` mantienen ambas protecciones.
+
 All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
