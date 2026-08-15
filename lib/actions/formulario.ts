@@ -30,8 +30,17 @@ export function casilla(formData: FormData, campo: string): boolean {
 
 export function aEstado<T>(resultado: ResultadoAccion<T>): EstadoFormularioAccion {
   if (resultado.ok) return {};
-  return {
-    error: resultado.errores ? undefined : resultado.error,
-    ...(resultado.errores ? { errores: resultado.errores } : {}),
-  };
+
+  // Con errores de campo se devuelve además un mensaje general. Un campo puede
+  // no tener dónde enseñar el suyo —una casilla, o uno dentro de una sección
+  // plegada— y entonces el formulario se limitaba a no hacer nada: ni guardaba
+  // ni decía por qué. Un fallo invisible es peor que uno feo.
+  if (resultado.errores) {
+    return {
+      error: 'Revisa los campos marcados: hay datos que no se han podido guardar.',
+      errores: resultado.errores,
+    };
+  }
+
+  return { error: resultado.error };
 }

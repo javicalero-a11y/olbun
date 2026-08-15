@@ -3,6 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { descifrarObjeto } from '@/lib/crypto/datos-personales';
 import { identityClientBecause, tenantTransaction } from '@/lib/db/tenant';
+import {
+  sembrarTiposCertificacion,
+  TIPOS_CERTIFICACION_POR_DEFECTO,
+} from '@/lib/services/personal/certificaciones';
 import { crearAdscripcion, crearPlantillaExigida } from '@/lib/services/personal/adscripciones';
 import { crearCertificacionEmpleado } from '@/lib/services/personal/certificaciones';
 import {
@@ -17,6 +21,8 @@ import { crearIncidencia } from '@/lib/services/riesgos';
 describe('personal, convenio y adscripción completos', () => {
   const elevated = identityClientBecause('integration test owns disposable personnel tenants');
   const suffix = randomUUID().slice(0, 8);
+  /** `createdById` no tiene relación declarada, así que basta una cadena. */
+  const actorDePrueba = `actor-${suffix}`;
   let organisationA = '';
   let organisationB = '';
   let contratoId = '';
@@ -257,6 +263,41 @@ describe('personal, convenio y adscripción completos', () => {
       'Nombre especialmente protegido',
     );
     expect(JSON.stringify(guardada.personasImplicadas)).toContain('v1.');
+  });
+
+  it('siembra los tipos de certificación en cada organización, no sólo en la primera', async () => {
+    // El alta corre sobre el cliente elevado, que no filtra por RLS. La
+    // comprobación de «¿ya existe este código?» se hacía sin organización, así
+    // que encontraba el código de otra empresa y no sembraba nada: la segunda
+    // organización y todas las siguientes se quedaban sin tipos y no podían
+    // registrar ni un certificado. Dos organizaciones es el número mínimo que
+    // distingue las dos versiones.
+    await elevated.$transaction(async (tx) => {
+      await sembrarTiposCertificacion(tx, organisationA, actorDePrueba);
+      await sembrarTiposCertificacion(tx, organisationB, actorDePrueba);
+    });
+
+    const codigosDe = (organisationId: string) =>
+      tenantTransaction(organisationId, (tx) =>
+        tx.tipoCertificacion.findMany({ select: { codigo: true } }),
+      ).then((filas) => filas.map((fila) => fila.codigo));
+
+    const esperados = TIPOS_CERTIFICACION_POR_DEFECTO.map((tipo) => tipo.codigo);
+    const [enA, enB] = await Promise.all([codigosDe(organisationA), codigosDe(organisationB)]);
+
+    // Cada organización tiene el catálogo completo. Se comparan los códigos y
+    // no el total, porque A ha creado además tipos propios en otras pruebas.
+    for (const codigo of esperados) {
+      expect(enA).toContain(codigo);
+      expect(enB).toContain(codigo);
+    }
+
+    // Y es idempotente: repetirlo no duplica.
+    await elevated.$transaction(async (tx) => {
+      await sembrarTiposCertificacion(tx, organisationB, actorDePrueba);
+    });
+
+    expect((await codigosDe(organisationB)).length).toBe(enB.length);
   });
 
   it('RLS no revela empleados a otro tenant aunque conozca el id', async () => {

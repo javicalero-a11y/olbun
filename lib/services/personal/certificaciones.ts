@@ -49,8 +49,14 @@ export async function sembrarTiposCertificacion(
   actorId: string,
 ): Promise<void> {
   for (const tipo of TIPOS_CERTIFICACION_POR_DEFECTO) {
+    // El filtro por organización es obligatorio aquí, y es fácil olvidarlo: el
+    // alta corre sobre el cliente elevado, que no está limitado por RLS porque
+    // la organización todavía no existe cuando empieza la transacción. Sin él,
+    // `findFirst` encontraba el código de OTRA organización y no sembraba
+    // nada: sólo la primera empresa registrada tenía tipos y ninguna de las
+    // siguientes podía registrar un certificado.
     const existe = await db.tipoCertificacion.findFirst({
-      where: { codigo: tipo.codigo },
+      where: { organisationId, codigo: tipo.codigo },
       select: { id: true },
     });
     if (!existe) {

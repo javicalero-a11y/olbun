@@ -79,7 +79,7 @@ test.describe('Personal y convenios', () => {
       label: 'Convenio auxiliar de prueba',
     });
     await formularioCategoria.getByLabel('Denominación').fill('Auxiliar de servicio');
-    await formularioCategoria.getByLabel('Grupo').fill('II');
+    await formularioCategoria.getByLabel('Grupo', { exact: true }).fill('II');
     await formularioCategoria.getByLabel('Nivel').fill('A');
     await formularioCategoria.getByLabel('Grupo SS').fill('10');
     await formularioCategoria.getByRole('button', { name: 'Guardar categoría' }).click();

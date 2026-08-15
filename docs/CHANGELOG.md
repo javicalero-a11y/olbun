@@ -11,7 +11,7 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
-## M11 — Personal, convenio y adscripción (implementado; cierre técnico pendiente, 2026-08-14)
+## M11 — Personal, convenio y adscripción (completo, 2026-08-15)
 
 - Directorio de personal con alta, estado laboral, jornada, antigüedad,
   subrogación, categoría profesional y convenio aplicable. Los listados no
@@ -41,9 +41,24 @@ SPEC §12.
   certificaciones repartidas entre válidas, próximas y caducadas.
 - ADR 0012, inventario de protección de datos y seis pruebas de integración
   con Postgres documentan cifrado, aislamiento RLS y decisiones de modelado.
-  TypeScript, ESLint, Prettier, Prisma y 1.306 pruebas sin acceso de red local
-  están verdes. El cierre queda pendiente de repetir la suite E2E y los tests
-  MinIO/ClamAV cuando el entorno de Codex recupere permiso para puertos locales.
+  TypeScript, ESLint, Prettier y Prisma están verdes, con 1.334 pruebas
+  unitarias y de integración contra Postgres real y 160 pruebas E2E contra una
+  compilación de producción.
+- Al cerrar el hito aparecieron tres fallos que las pruebas unitarias no podían
+  ver, porque estaban justo en la costura entre el formulario y el esquema:
+  - **El alta de empleados no funcionaba en absoluto.** El ayudante compartido
+    `casilla()` devuelve un booleano y el esquema sólo aceptaba el «on» crudo
+    del HTML, así que cuatro casillas tumbaban el alta entera. El esquema
+    acepta ahora las dos formas, en personal y en riesgos.
+  - **Y fallaba en silencio**: los errores de esas casillas no tenían dónde
+    enseñarse, de modo que el formulario ni guardaba ni decía por qué. Cualquier
+    error de campo devuelve ahora también un mensaje general.
+  - **Los tipos de certificación sólo se sembraban en la primera empresa
+    registrada.** La comprobación de «¿ya existe este código?» corría sobre el
+    cliente elevado sin filtrar por organización, así que encontraba el código
+    de otra empresa y no creaba nada; ninguna organización posterior podía
+    registrar un certificado. Cubierto con una prueba de integración de dos
+    organizaciones.
 
 ## M10 — Riesgos e incidencias (completo, 2026-08-14)
 

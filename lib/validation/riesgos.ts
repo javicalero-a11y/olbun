@@ -62,9 +62,14 @@ const fechaOpcional = z
 const escala = z.coerce.number().int().min(1).max(5);
 const id = z.string().trim().min(1).max(40);
 const casilla = z
-  .union([z.literal('on'), z.literal('')])
+  // Acepta las dos formas que llegan: el valor crudo de una casilla HTML
+  // («on» marcada, «» o ausente sin marcar) y el booleano que devuelve el
+  // ayudante compartido `casilla(formData, campo)`. Aceptar sólo la primera
+  // obligaba a cada acción a deshacer la conversión con `? 'on' : ''`, y la
+  // que se olvidaba de hacerlo fallaba la validación en silencio.
+  .union([z.literal('on'), z.literal(''), z.boolean()])
   .optional()
-  .transform((valor) => valor === 'on');
+  .transform((valor) => valor === 'on' || valor === true);
 
 export const incidenciaSchema = z.object({
   tipo: z.enum(TIPOS_INCIDENCIA),

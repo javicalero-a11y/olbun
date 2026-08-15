@@ -81,4 +81,34 @@ describe('validación de personal', () => {
     expect(tabla.salarioBaseMensual).toBe(1325.5);
     expect(tabla.jornadaAnualHoras).toBe(1792);
   });
+
+  it('acepta las casillas como booleano, que es lo que manda el formulario', () => {
+    // `casilla(formData, campo)` del ayudante compartido devuelve un booleano,
+    // no el «on» crudo del HTML. Cuando el esquema sólo admitía «on» el alta de
+    // empleados fallaba entera y en silencio: cuatro casillas la tumbaban sin
+    // que apareciera un solo mensaje en pantalla.
+    const conBooleanos = empleadoSchema.safeParse({
+      ...empleadoValido,
+      esSubrogado: false,
+      tieneReduccionJornada: false,
+      tieneDiscapacidadReconocida: true,
+      esRepresentanteTrabajadores: false,
+    });
+
+    expect(conBooleanos.success).toBe(true);
+    if (conBooleanos.success) {
+      expect(conBooleanos.data.tieneDiscapacidadReconocida).toBe(true);
+      expect(conBooleanos.data.esSubrogado).toBe(false);
+    }
+
+    // Y sigue aceptando la forma cruda, que es la que llega de un envío sin JS.
+    const conCadenas = empleadoSchema.safeParse({
+      ...empleadoValido,
+      esSubrogado: 'on',
+      tieneReduccionJornada: '',
+    });
+
+    expect(conCadenas.success).toBe(true);
+    if (conCadenas.success) expect(conCadenas.data.esSubrogado).toBe(true);
+  });
 });
