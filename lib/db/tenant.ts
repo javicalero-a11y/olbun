@@ -74,6 +74,7 @@ const TENANT_OWNED = new Set<string>([
   'AdscripcionContrato',
   'TipoCertificacion',
   'CertificacionEmpleado',
+  'Ausencia',
 ]);
 
 /** Exported so a test can assert it covers every model carrying organisationId. */

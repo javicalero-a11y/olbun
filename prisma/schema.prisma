@@ -142,6 +142,7 @@ model Organisation {
   plantillasExigidas    PlantillaExigida[]
   tiposCertificacion    TipoCertificacion[]
   certificaciones       CertificacionEmpleado[]
+  ausencias             Ausencia[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -1521,6 +1522,7 @@ model Incidencia {
   acciones     AccionCorrectora[]
   riesgos      Riesgo[]
   documentos   Documento[]
+  ausencias    Ausencia[]
 
   @@unique([organisationId, referencia])
   @@index([organisationId, estado, fechaHecho])
@@ -2046,6 +2048,34 @@ enum TurnoTrabajo {
   OTRO
 }
 
+/// Tipos de ausencia de SPEC §4.8. En español porque son los términos del
+/// parte de baja y del convenio.
+enum TipoAusencia {
+  IT_CONTINGENCIA_COMUN
+  IT_CONTINGENCIA_PROFESIONAL
+  ACCIDENTE_TRABAJO
+  ACCIDENTE_IN_ITINERE
+  ENFERMEDAD_PROFESIONAL
+  NACIMIENTO_CUIDADO_MENOR
+  RIESGO_EMBARAZO
+  RIESGO_LACTANCIA
+  PERMISO_RETRIBUIDO
+  PERMISO_NO_RETRIBUIDO
+  EXCEDENCIA
+  VACACIONES
+  HUELGA
+  SANCION
+  AUSENCIA_INJUSTIFICADA
+  FORMACION
+  CREDITO_HORARIO_SINDICAL
+}
+
+enum EstadoAusencia {
+  PREVISTA
+  ACTIVA
+  CERRADA
+}
+
 enum EstadoCertificacion {
   VALIDA
   PROXIMA_A_CADUCAR
@@ -2227,6 +2257,8 @@ model Empleado {
   contratoOrigenSubrogacion Contrato?               @relation("ContratoOrigenSubrogacion", fields: [contratoOrigenSubrogacionId], references: [id], onDelete: SetNull)
   adscripciones             AdscripcionContrato[]
   certificaciones           CertificacionEmpleado[]
+  ausencias                 Ausencia[]
+  sustitucionesQueCubre     Ausencia[]              @relation("SustitucionAusencia")
 
   @@unique([organisationId, numeroEmpleado])
   @@unique([organisationId, nifHash])
@@ -2265,6 +2297,66 @@ model PlantillaExigida {
   @@index([organisationId, contratoId, centroTrabajo])
   @@index([organisationId, categoriaId])
   @@map("plantillas_exigidas")
+}
+
+/// Una ausencia y lo que se lleva por delante (SPEC §4.8, M12).
+///
+/// Guarda los días naturales y los laborables por separado, calculados al
+/// grabar: la Seguridad Social cuenta los primeros y un déficit de cobertura
+/// los segundos, y derivar uno del otro más tarde obliga a rehacer el
+/// calendario de festivos que ya se conocía en ese momento.
+///
+/// El diagnóstico NO se guarda. Es dato de salud del artículo 9 del RGPD y no
+/// hace falta para cubrir un turno: basta el tipo, las fechas y el número de
+/// parte.
+model Ausencia {
+  id             String @id @default(cuid(2))
+  organisationId String
+  empleadoId     String
+
+  tipo    TipoAusencia
+  /// Para los permisos del art. 37 ET: matrimonio, fallecimiento, traslado…
+  subtipo String?
+
+  fechaInicio      DateTime  @db.Date
+  fechaFinPrevista DateTime? @db.Date
+  fechaFinReal     DateTime? @db.Date
+
+  /// Calculados al grabar contra el calendario vigente entonces.
+  diasNaturales  Int
+  diasLaborables Int
+
+  /// Datos del parte. `numeroParteSS` identifica la baja ante la Seguridad
+  /// Social; la mutua sólo aplica a contingencia profesional.
+  numeroParteSS        String?
+  mutua                String?
+  esRecaida            Boolean @default(false)
+  parteBajaDocumentoId String?
+
+  requiereSustitucion      Boolean @default(false)
+  sustitucionCubiertaPorId String?
+
+  /// Para accidentes: enlaza con el parte y, más adelante, con Delt@.
+  incidenciaId String?
+
+  estado EstadoAusencia @default(PREVISTA)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation        Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  empleado            Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  sustitucionCubierta Empleado?    @relation("SustitucionAusencia", fields: [sustitucionCubiertaPorId], references: [id], onDelete: SetNull)
+  incidencia          Incidencia?  @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+
+  @@index([organisationId, empleadoId, fechaInicio])
+  @@index([organisationId, tipo, fechaInicio])
+  @@index([organisationId, estado])
+  @@map("ausencias")
 }
 
 model AdscripcionContrato {

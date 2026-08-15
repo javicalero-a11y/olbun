@@ -11,6 +11,40 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M12 — Absentismo y cobertura (primera tanda, 2026-08-15)
+
+- **Ausencias con los diecisiete tipos de SPEC §4.8**, de la IT al crédito
+  horario sindical, cada uno con lo que significa: si computa absentismo, si
+  hay que cubrir el turno y si la paga la empresa.
+- Dos distinciones que el módulo entero sostiene y que es fácil confundir:
+  - **Disponibilidad no es absentismo.** Las vacaciones quitan a alguien del
+    turno igual que una baja —las horas hay que cubrirlas— pero no son
+    absentismo. Un índice que las metiera dentro diría que una empresa que
+    cumple falla cada agosto, y alguien lo citaría en una reunión como si no.
+  - **Los días se cuentan dos veces y a propósito.** Un parte de viernes a
+    lunes son cuatro naturales y dos laborables: la Seguridad Social pide el
+    primer número y un déficit de cobertura el segundo. Se calculan al grabar,
+    contra el calendario de entonces, porque un festivo añadido después no
+    puede reescribir un dato ya declarado.
+- **La huelga no propone sustituto.** Sustituir a quien la secunda es ilegal
+  (art. 6.5 RDL 17/1977) y el producto no puede sugerirlo como un turno que
+  cubrir. El crédito sindical tampoco computa: poner número al ejercicio de un
+  derecho no es medir nada.
+- **Cobertura real por categoría y centro**, que es lo que M11 no podía
+  responder: no quién está adscrito en el papel, sino cuántas horas de cada
+  categoría hubo de verdad una vez descontadas las ausencias. Dos ausencias el
+  mismo día no restan dos veces.
+- El reparto de la semana entre cinco días es una simplificación declarada en
+  el código y en la pantalla: quien hace 3×12 pierde más por día ausente. Los
+  turnos reales llegan en M13, cuando haya fichajes de donde leerlos.
+- No se guarda el diagnóstico. Es dato de salud del artículo 9 y no hace falta
+  para cubrir un turno: basta el tipo, las fechas y el número de parte.
+- Verificado con 1.359 pruebas unitarias y de integración contra Postgres real
+  —aislamiento RLS de la tabla nueva incluido— y 166 E2E contra una compilación
+  de producción.
+- Queda para la siguiente tanda: el planificador de cobertura y las detecciones
+  estructuradas de infradotación.
+
 ## M11 — Personal, convenio y adscripción (completo, 2026-08-15)
 
 - Directorio de personal con alta, estado laboral, jornada, antigüedad,
