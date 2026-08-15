@@ -625,6 +625,7 @@ model Contrato {
   adscripciones              AdscripcionContrato[]
   plantillaExigida           PlantillaExigida[]
   empleadosOrigenSubrogacion Empleado[]            @relation("ContratoOrigenSubrogacion")
+  deteccions                 Deteccion[]
 
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
@@ -1336,6 +1337,14 @@ model Adjunto {
 ///
 /// The catalogue is closed on purpose: a detection whose type nobody has
 /// decided what to do with is a notification, not a signal.
+/// De dónde sale una detección. Las de SISTEMA no tienen mensaje ni cita que
+/// verificar: su prueba es un cálculo sobre los datos del propio tenant, que
+/// cualquiera puede rehacer.
+enum OrigenDeteccion {
+  COMUNICACION
+  SISTEMA
+}
+
 enum TipoDeteccion {
   REQUERIMIENTO_FORMAL
   PREAVISO_PENALIDAD
@@ -1351,6 +1360,10 @@ enum TipoDeteccion {
   SINIESTRO
   PLAZO_MENCIONADO
   RIESGO_PRL
+  /// Señales de §4.4 que salen del estado del sistema, no del correo.
+  INFRADOTACION_PLIEGO
+  PERSONAL_CLAVE_SIN_SUSTITUTO
+  CERTIFICACION_CADUCADA_ADSCRITO
 }
 
 enum EstadoDeteccion {
@@ -1378,10 +1391,19 @@ model Deteccion {
   id             String @id @default(cuid(2))
   organisationId String
 
+  origen OrigenDeteccion @default(COMUNICACION)
+
   /// The message this was found in. `notificacionId` joins it when electronic
   /// notifications arrive (SPEC §4.3) — a notification is what starts a legal
   /// clock, so it will carry detections of its own.
-  comunicacionId String
+  ///
+  /// Null for `SISTEMA` detections: they come from evaluating the tenant's own
+  /// data, so there is no message and no quote to verify.
+  comunicacionId String?
+
+  /// The contract a SISTEMA detection is about. Message detections reach their
+  /// contract through the comunicación instead.
+  contratoId String?
 
   tipo            TipoDeteccion
   /// 0–1, after verification penalties. This is the number the queue sorts on.
@@ -1417,15 +1439,21 @@ model Deteccion {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  comunicacion Comunicacion @relation(fields: [comunicacionId], references: [id], onDelete: Cascade)
-  expediente   Expediente?  @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  comunicacion Comunicacion? @relation(fields: [comunicacionId], references: [id], onDelete: Cascade)
+  contrato     Contrato?     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  expediente   Expediente?   @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
 
   /// One finding of each kind per message. Re-analysing a message must refresh
   /// what is still pending, not pile a second copy on top of it — and must
   /// never resurrect something a person already discarded.
   @@unique([organisationId, comunicacionId, tipo])
+  /// The same rule for SISTEMA findings, which have no message: one of each
+  /// kind per contract. Postgres treats NULLs as distinct, so each constraint
+  /// only bites for the origin whose column is actually set.
+  @@unique([organisationId, contratoId, tipo])
   @@index([organisationId, estado, confianza])
+  @@index([organisationId, origen, estado])
   @@map("detecciones")
 }
 

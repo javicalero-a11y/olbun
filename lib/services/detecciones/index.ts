@@ -14,6 +14,7 @@ import type { EntradaAnalisis, MotorDeteccion } from './motor';
 import type { FechaCivil } from '@/lib/domain/fecha';
 import type { Prisma } from '@prisma/client';
 import type { TenantTransactionClient } from '@/lib/db/tenant';
+import { resumenDeDatos } from './sistema';
 
 /**
  * Turning proposals into a reviewable queue (SPEC §4.4, §5.4, §6.4).
@@ -251,6 +252,9 @@ export async function confirmarDeteccion(
       tipo: true,
       estado: true,
       extractos: true,
+      origen: true,
+      contratoId: true,
+      datosExtraidos: true,
       comunicacion: {
         select: { id: true, asunto: true, contratoId: true, expedienteId: true },
       },
@@ -268,6 +272,18 @@ export async function confirmarDeteccion(
 
   const cita = resumenDesdeExtractos(deteccion.extractos);
 
+  // Las detecciones de sistema no tienen mensaje del que colgar. Su asunto es
+  // lo que el propio motor calculó y su contrato viene en la fila, no a través
+  // de una comunicación.
+  const asunto = deteccion.comunicacion?.asunto ?? definicion.etiqueta;
+  const contratoId = deteccion.comunicacion?.contratoId ?? deteccion.contratoId ?? undefined;
+  const resumenDeSistema = resumenDeDatos(deteccion.datosExtraidos);
+
+  /** Marks the source message reviewed, when there is one to mark. */
+  const cerrarOrigen = async () => {
+    if (deteccion.comunicacion) await marcarRevisada(db, deteccion.comunicacion.id);
+  };
+
   // An incidencia: something that already happened, and whose date is the day
   // the message reporting it was sent — the reviewer confirmed that reading.
   if (definicion.destino === 'INCIDENCIA') {
@@ -275,8 +291,8 @@ export async function confirmarDeteccion(
       tipo: definicion.incidencia?.tipo ?? 'FALLO_SERVICIO',
       gravedad: definicion.incidencia?.gravedad ?? 'MODERADA',
       fechaHecho: aDate(datos.fechaApertura),
-      descripcion: cita ?? `${definicion.etiqueta} — ${deteccion.comunicacion.asunto}`,
-      contratoId: deteccion.comunicacion.contratoId ?? undefined,
+      descripcion: cita ?? resumenDeSistema ?? `${definicion.etiqueta} — ${asunto}`,
+      contratoId,
       deteccionId: deteccion.id,
       creadoPorId: datos.revisorId,
     });
@@ -285,7 +301,7 @@ export async function confirmarDeteccion(
       where: { id: deteccion.id },
       data: { estado: 'CONVERTIDA', ...revisada },
     });
-    await marcarRevisada(db, deteccion.comunicacion.id);
+    await cerrarOrigen();
 
     return {
       estado: 'CONVERTIDA',
@@ -305,14 +321,17 @@ export async function confirmarDeteccion(
     );
     const riesgo = await crearRiesgo(db, organisationId, {
       categoriaId: categoria.id,
-      causa: `Detectado en «${deteccion.comunicacion.asunto}»`,
+      causa:
+        deteccion.origen === 'SISTEMA'
+          ? `Detectado por el motor sobre los datos del sistema`
+          : `Detectado en «${asunto}»`,
       evento: definicion.etiqueta,
-      consecuencia: cita ?? definicion.descripcion,
+      consecuencia: cita ?? resumenDeSistema ?? definicion.descripcion,
       // The midpoint of the matrix, and the reason the register shows every
       // risk born this way as pending assessment.
       probabilidadInherente: 3,
       impactoInherente: 3,
-      contratoId: deteccion.comunicacion.contratoId ?? undefined,
+      contratoId,
       deteccionId: deteccion.id,
       creadoPorId: datos.revisorId,
     });
@@ -321,7 +340,7 @@ export async function confirmarDeteccion(
       where: { id: deteccion.id },
       data: { estado: 'CONVERTIDA', ...revisada },
     });
-    await marcarRevisada(db, deteccion.comunicacion.id);
+    await cerrarOrigen();
 
     return {
       estado: 'CONVERTIDA',
@@ -338,7 +357,7 @@ export async function confirmarDeteccion(
       where: { id: deteccion.id },
       data: { estado: 'CONFIRMADA', ...revisada },
     });
-    await marcarRevisada(db, deteccion.comunicacion.id);
+    await cerrarOrigen();
 
     return { estado: 'CONFIRMADA', destino: 'NINGUNO' };
   }
@@ -353,10 +372,10 @@ export async function confirmarDeteccion(
   });
 
   const expediente = await abrirExpediente(db, organisationId, {
-    titulo: datos.titulo?.trim() || `${definicion.etiqueta} — ${deteccion.comunicacion.asunto}`,
+    titulo: datos.titulo?.trim() || `${definicion.etiqueta} — ${asunto}`,
     tipo: plantillaExpediente.tipo,
     jurisdiccion: plantillaExpediente.jurisdiccion,
-    contratoId: deteccion.comunicacion.contratoId ?? undefined,
+    contratoId,
     plantillaId: plantilla?.id,
     fechaApertura: datos.fechaApertura,
     resumen: resumenDesdeExtractos(deteccion.extractos),
@@ -370,13 +389,13 @@ export async function confirmarDeteccion(
 
   // The message is filed against the expediente it produced, so the letter and
   // the case are one click apart in both directions.
-  if (!deteccion.comunicacion.expedienteId) {
+  if (deteccion.comunicacion && !deteccion.comunicacion.expedienteId) {
     await db.comunicacion.update({
       where: { id: deteccion.comunicacion.id },
       data: { expedienteId: expediente.expedienteId, estadoRevision: 'REVISADA' },
     });
   } else {
-    await marcarRevisada(db, deteccion.comunicacion.id);
+    await cerrarOrigen();
   }
 
   return {

@@ -42,8 +42,30 @@ SPEC §12.
 - Verificado con 1.359 pruebas unitarias y de integración contra Postgres real
   —aislamiento RLS de la tabla nueva incluido— y 166 E2E contra una compilación
   de producción.
-- Queda para la siguiente tanda: el planificador de cobertura y las detecciones
-  estructuradas de infradotación.
+- **El motor de detección deja de mirar sólo el correo.** Tres de las señales
+  de SPEC §4.4 se calculan ya sobre los datos del propio tenant: cobertura por
+  debajo del pliego, personal clave ausente sin sustituto y certificación
+  obligatoria caducada en persona adscrita. Van a la misma cola, con la misma
+  revisión humana y sin abrir nada por su cuenta.
+- Estas detecciones no traen cita porque no hay texto: su prueba es el cálculo,
+  y se guarda entero para que quien revisa pueda rehacerlo a mano en vez de
+  creerse una puntuación. La confianza es 1 y no es una fanfarronada — el motor
+  no adivina si las horas cuadran, las ha sumado. Lo que sigue siendo de la
+  persona es qué significan: un déficit sobre el papel puede ser un cuadrante
+  que el software todavía no ve.
+- Reevaluar es seguro y está pensado para hacerse a menudo: refresca lo que
+  sigue pendiente y **nunca resucita lo que alguien ya descartó**. Volver a
+  preguntar algo ya decidido enseña a cerrar la cola sin leerla.
+- La huelga no se señala como puesto sin cubrir. Sustituir a quien la secunda
+  es ilegal, así que sacarla ahí sería invitar a hacer justo lo que no se puede.
+- Una tolerancia de una hora antes de avisar: repartir la jornada semanal entre
+  días laborables deja fracciones, y una cola que salta por un cuarto de hora
+  es una cola que se cierra sin mirar.
+- `modelId` y `promptVersion` también en las de sistema (`reglas-sistema-1`),
+  para que «la cola empeoró la semana pasada» siga siendo una pregunta con
+  respuesta.
+- Queda para la siguiente tanda: el planificador de cobertura y las señales de
+  §4.4 que dependen de hitos posteriores.
 
 ## M11 — Personal, convenio y adscripción (completo, 2026-08-15)
 

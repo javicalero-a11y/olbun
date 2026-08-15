@@ -16,18 +16,36 @@ import type { TipoDeteccion } from '@prisma/client';
  */
 
 const TIPOS = Object.keys(TIPOS_DETECCION) as TipoDeteccion[];
+const DE_COMUNICACION = TIPOS.filter((tipo) => TIPOS_DETECCION[tipo].origen === 'COMUNICACION');
+const DE_SISTEMA = TIPOS.filter((tipo) => TIPOS_DETECCION[tipo].origen === 'SISTEMA');
 
 describe('TIPOS_DETECCION', () => {
-  it('cubre los catorce tipos del SPEC', () => {
-    expect(TIPOS).toHaveLength(14);
+  it('cubre los catorce tipos de correo del SPEC y los tres de sistema', () => {
+    expect(DE_COMUNICACION).toHaveLength(14);
+    expect(DE_SISTEMA).toHaveLength(3);
   });
 
-  it('cada tipo tiene etiqueta, descripción y señales para el prompt', () => {
+  it('cada tipo tiene etiqueta y descripción', () => {
     for (const tipo of TIPOS) {
       const definicion = TIPOS_DETECCION[tipo];
       expect(definicion.etiqueta.length, tipo).toBeGreaterThan(0);
       expect(definicion.descripcion.length, tipo).toBeGreaterThan(0);
-      expect(definicion.senales.length, tipo).toBeGreaterThan(0);
+    }
+  });
+
+  it('todo tipo que va al prompt trae señales que buscar', () => {
+    // La invariante sigue siendo estricta donde importa: un tipo de correo sin
+    // señales produce una detección que el motor no sabe encontrar.
+    for (const tipo of DE_COMUNICACION) {
+      expect(TIPOS_DETECCION[tipo].senales.length, tipo).toBeGreaterThan(0);
+    }
+  });
+
+  it('los tipos de sistema no llevan señales: no hay texto donde buscar', () => {
+    // Su prueba es un cálculo sobre los datos del tenant, no una frase. Darles
+    // señales sugeriría que el motor de correo puede levantarlos, y no puede.
+    for (const tipo of DE_SISTEMA) {
+      expect(TIPOS_DETECCION[tipo].senales, tipo).toBe('');
     }
   });
 

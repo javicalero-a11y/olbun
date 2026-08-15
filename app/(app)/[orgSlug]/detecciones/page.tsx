@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { confirmar, descartar } from './acciones';
+import { confirmar, descartar, evaluarSistema } from './acciones';
 import { ColaDetecciones } from '@/components/features/detecciones/cola';
+import { EvaluarSistema } from '@/components/features/detecciones/evaluar-sistema';
 import { contextoDe } from '@/lib/domain/detecciones/verificacion';
 import { esBajaConfianza, prioridad, TIPOS_DETECCION } from '@/lib/domain/detecciones/tipos';
 import { requirePermission } from '@/lib/auth/guardias';
@@ -108,6 +109,9 @@ export default async function DeteccionesPage({
       extractosDescartados: true,
       datosExtraidos: true,
       modelId: true,
+      origen: true,
+      createdAt: true,
+      contrato: { select: { numeroExpediente: true } },
       comunicacion: {
         select: {
           id: true,
@@ -126,16 +130,25 @@ export default async function DeteccionesPage({
   const filas: FilaDeteccion[] = detecciones
     .map((deteccion) => {
       const definicion = TIPOS_DETECCION[deteccion.tipo];
-      const fecha = deteccion.comunicacion.fechaEnvio ?? deteccion.comunicacion.fechaRecepcion;
+      const comunicacion = deteccion.comunicacion;
+
+      // Una detección de sistema no nace de un mensaje: no hay fecha de envío
+      // de la que partir ni texto que reconstruir, así que se toma la fecha en
+      // que el motor la levantó.
+      const fecha = comunicacion
+        ? (comunicacion.fechaEnvio ?? comunicacion.fechaRecepcion)
+        : deteccion.createdAt;
 
       // Rebuilt exactly as the engine saw it, so the stored offsets land where
       // they were computed.
-      const fuente = textoFuenteDe({
-        asunto: deteccion.comunicacion.asunto,
-        de: deteccion.comunicacion.de,
-        fecha,
-        cuerpo: deteccion.comunicacion.cuerpoTexto ?? '',
-      });
+      const fuente = comunicacion
+        ? textoFuenteDe({
+            asunto: comunicacion.asunto,
+            de: comunicacion.de,
+            fecha,
+            cuerpo: comunicacion.cuerpoTexto ?? '',
+          })
+        : '';
 
       return {
         id: deteccion.id,
@@ -150,13 +163,16 @@ export default async function DeteccionesPage({
         abreExpediente: definicion.destino === 'EXPEDIENTE',
         destino: destinoLegible(definicion.destino),
         verboConfirmar: verboDe(definicion.destino),
-        comunicacion: {
-          id: deteccion.comunicacion.id,
-          asunto: deteccion.comunicacion.asunto,
-          de: deteccion.comunicacion.de,
-          fecha: fechaCorta(fecha),
-          contrato: deteccion.comunicacion.contrato?.numeroExpediente ?? null,
-        },
+        comunicacion: comunicacion
+          ? {
+              id: comunicacion.id,
+              asunto: comunicacion.asunto,
+              de: comunicacion.de,
+              fecha: fechaCorta(fecha),
+              contrato: comunicacion.contrato?.numeroExpediente ?? null,
+            }
+          : null,
+        contrato: deteccion.contrato?.numeroExpediente ?? null,
         extractos: extractosDe(deteccion.extractos).map((extracto) =>
           contextoDe(fuente, extracto),
         ),
@@ -176,13 +192,16 @@ export default async function DeteccionesPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Detecciones</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Lo que se ha señalado en la correspondencia, con la frase exacta que lo justifica.
-          Nada de esto ha hecho nada todavía: confirmar es lo que abre un expediente, y lo hace
-          una persona.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Detecciones</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Lo que se ha señalado en la correspondencia y en los propios datos, con la frase
+            exacta —o el cálculo— que lo justifica. Nada de esto ha hecho nada todavía:
+            confirmar es lo que abre un expediente, y lo hace una persona.
+          </p>
+        </div>
+        <EvaluarSistema evaluar={evaluarSistema.bind(null, orgSlug)} />
       </div>
 
       {/* Always rendered, even with nothing in it: the list holds the message

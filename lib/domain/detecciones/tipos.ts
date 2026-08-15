@@ -54,7 +54,17 @@ export interface DefinicionTipo {
   incidencia?: { tipo: TipoIncidencia; gravedad: GravedadIncidencia };
   /** For `RIESGO`, which family of the register it belongs to. */
   riesgo?: { categoria: ClaveCategoriaRiesgo };
-  /** What the engine should look for. Goes into the prompt verbatim. */
+  /**
+   * Where this kind comes from. `COMUNICACION` types are what the Claude
+   * engine looks for in a message; `SISTEMA` types are computed from the
+   * tenant's own data and have no prompt and no quote to verify.
+   */
+  origen: 'COMUNICACION' | 'SISTEMA';
+  /**
+   * What the engine should look for. Goes into the prompt verbatim, so it is
+   * required for `COMUNICACION` types and empty for `SISTEMA` ones — there is
+   * no text to search.
+   */
   senales: string;
 }
 
@@ -65,6 +75,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 1,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'EXPEDIENTE_SANCIONADOR', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'acuerdo de incoación, inicio de expediente sancionador, nombramiento de instructor, pliego de cargos',
   },
@@ -74,6 +85,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 1,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'RESOLUCION_CONTRATO', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'resolución del contrato, causa de resolución, incautación de la garantía, apercibimiento de resolución',
   },
@@ -83,6 +95,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.9,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'PENALIDAD', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'propuesta de penalidad, imposición de penalidades, descuento en la certificación por penalidad',
   },
@@ -92,6 +105,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.8,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'EXPEDIENTE_SANCIONADOR', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'se requiere a la empresa, deberá subsanar, en el plazo de … días, con advertencia de, trámite de audiencia',
   },
@@ -101,6 +115,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.85,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'RECLAMACION_CANTIDAD', jurisdiccion: 'SOCIAL' },
+    origen: 'COMUNICACION',
     senales:
       'papeleta de conciliación, SMAC, demanda ante el juzgado de lo social, acta de infracción, Inspección de Trabajo',
   },
@@ -110,6 +125,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.7,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'SUBROGACION', jurisdiccion: 'SOCIAL' },
+    origen: 'COMUNICACION',
     senales: 'listado de subrogación, personal a subrogar, sucesión de empresa, artículo 44 ET',
   },
   IMPAGO_FACTURA: {
@@ -118,6 +134,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.6,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'IMPAGO_MOROSIDAD', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'factura pendiente de pago, reclamación de intereses de demora, periodo medio de pago, factura devuelta',
   },
@@ -127,6 +144,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.5,
     destino: 'EXPEDIENTE',
     expediente: { tipo: 'MODIFICADO', jurisdiccion: 'ADMINISTRATIVA' },
+    origen: 'COMUNICACION',
     senales:
       'modificación del contrato, ampliación del objeto, modificado, incremento de prestaciones',
   },
@@ -139,6 +157,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     // term of art is a third-party claim, which is what a siniestro becomes the
     // moment somebody asks us to pay for it.
     expediente: { tipo: 'RECLAMACION_TERCERO', jurisdiccion: 'CIVIL' },
+    origen: 'COMUNICACION',
     senales: 'daños causados, parte de siniestro, reclamación patrimonial, póliza de seguro',
   },
   INCUMPLIMIENTO_ALEGADO: {
@@ -147,6 +166,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.55,
     destino: 'INCIDENCIA',
     incidencia: { tipo: 'FALLO_SERVICIO', gravedad: 'MODERADA' },
+    origen: 'COMUNICACION',
     senales:
       'incumplimiento del pliego, no se ha prestado el servicio, deficiencias reiteradas, falta de personal',
   },
@@ -156,6 +176,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.4,
     destino: 'INCIDENCIA',
     incidencia: { tipo: 'QUEJA_USUARIO', gravedad: 'LEVE' },
+    origen: 'COMUNICACION',
     senales: 'queja formal, escrito de queja, reiteramos la queja, registro de entrada',
   },
   RECLAMACION_USUARIO: {
@@ -164,6 +185,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.35,
     destino: 'INCIDENCIA',
     incidencia: { tipo: 'QUEJA_USUARIO', gravedad: 'LEVE' },
+    origen: 'COMUNICACION',
     senales:
       'hoja de reclamaciones, usuario del servicio, reclamación del residente o del familiar',
   },
@@ -173,6 +195,7 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
     gravedad: 0.75,
     destino: 'RIESGO',
     riesgo: { categoria: 'PREVENCION' },
+    origen: 'COMUNICACION',
     senales:
       'riesgo grave e inminente, accidente de trabajo, evaluación de riesgos, coordinación de actividades empresariales',
   },
@@ -182,8 +205,45 @@ export const TIPOS_DETECCION: Readonly<Record<TipoDeteccion, DefinicionTipo>> = 
       'Se cita un plazo. Nunca crea un plazo por sí solo: hay que comprobar en qué se funda.',
     gravedad: 0.65,
     destino: 'NINGUNO',
+    origen: 'COMUNICACION',
     senales:
       'en el plazo de … días hábiles, dispone de … días naturales, antes del día …, con carácter improrrogable',
+  },
+
+  // Señales de SPEC §4.4 que no salen del correo sino del estado del sistema.
+  // No llevan `senales` que buscar en un texto: su prueba es un cálculo sobre
+  // los datos del propio tenant, que va en `datosExtraidos` y que cualquiera
+  // puede rehacer. Siguen pasando por la misma cola: el motor propone y una
+  // persona decide, igual que con un correo.
+  INFRADOTACION_PLIEGO: {
+    etiqueta: 'Cobertura por debajo del pliego',
+    descripcion:
+      'Las horas disponibles de una categoría no llegan a las que exige el pliego en ese centro.',
+    gravedad: 0.9,
+    destino: 'RIESGO',
+    riesgo: { categoria: 'OPERATIVO' },
+    origen: 'SISTEMA',
+    senales: '',
+  },
+  PERSONAL_CLAVE_SIN_SUSTITUTO: {
+    etiqueta: 'Personal clave ausente sin sustituto',
+    descripcion:
+      'Alguien marcado como personal clave del contrato está ausente y nadie cubre su puesto.',
+    gravedad: 0.95,
+    destino: 'RIESGO',
+    riesgo: { categoria: 'OPERATIVO' },
+    origen: 'SISTEMA',
+    senales: '',
+  },
+  CERTIFICACION_CADUCADA_ADSCRITO: {
+    etiqueta: 'Certificación obligatoria caducada',
+    descripcion:
+      'Una persona adscrita al contrato tiene caducada una certificación obligatoria.',
+    gravedad: 0.85,
+    destino: 'RIESGO',
+    riesgo: { categoria: 'PREVENCION' },
+    origen: 'SISTEMA',
+    senales: '',
   },
 };
 

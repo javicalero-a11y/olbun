@@ -34,13 +34,19 @@ export interface FilaDeteccion {
   /** The submit label. Distinct per destination so the button says what
    * it will actually do, rather than a generic «Confirmar». */
   verboConfirmar: string;
+  /**
+   * The message it was found in. Null for SISTEMA findings, which come from
+   * evaluating the tenant's own data and have no message behind them.
+   */
   comunicacion: {
     id: string;
     asunto: string;
     de: string;
     fecha: string;
     contrato: string | null;
-  };
+  } | null;
+  /** Set for SISTEMA findings: which contract the computation is about. */
+  contrato: string | null;
   /** Verified quote with the text either side of it, from the source. */
   extractos: { antes: string; cita: string; despues: string }[];
   datos: { etiqueta: string; valor: string }[];
@@ -341,10 +347,19 @@ function Fila({
         </dl>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        {fila.comunicacion.asunto} · {fila.comunicacion.de} · {fila.comunicacion.fecha}
-        {fila.comunicacion.contrato ? ` · ${fila.comunicacion.contrato}` : ' · sin contrato'}
-      </p>
+      {fila.comunicacion ? (
+        <p className="text-xs text-muted-foreground">
+          {fila.comunicacion.asunto} · {fila.comunicacion.de} · {fila.comunicacion.fecha}
+          {fila.comunicacion.contrato ? ` · ${fila.comunicacion.contrato}` : ' · sin contrato'}
+        </p>
+      ) : (
+        // Sin mensaje detrás: lo que hay que enseñar es de dónde sale el
+        // cálculo, no un remitente que no existe.
+        <p className="text-xs text-muted-foreground">
+          Calculado sobre los datos del sistema
+          {fila.contrato ? ` · ${fila.contrato}` : ''} · {fila.motor}
+        </p>
+      )}
 
       {error ? (
         <p role="alert" className="text-xs text-destructive">
@@ -417,7 +432,11 @@ function Fila({
                     id={`titulo-${fila.id}`}
                     name="titulo"
                     type="text"
-                    placeholder={`${fila.etiqueta} — ${fila.comunicacion.asunto}`}
+                    placeholder={
+                      fila.comunicacion
+                        ? `${fila.etiqueta} — ${fila.comunicacion.asunto}`
+                        : fila.etiqueta
+                    }
                     className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
                   />
                 </div>

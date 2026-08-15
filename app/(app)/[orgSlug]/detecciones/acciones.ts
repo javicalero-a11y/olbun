@@ -7,9 +7,11 @@ import {
   descartarDeteccion,
   ErrorMotor,
 } from '@/lib/services/detecciones';
+import { aEstado, texto } from '@/lib/actions/formulario';
 import { crearAccion, ErrorDeCampo } from '@/lib/actions/crear-accion';
+import { evaluarEstadoDelSistema } from '@/lib/services/detecciones/sistema';
 import { TIPOS_DETECCION } from '@/lib/domain/detecciones/tipos';
-import { texto } from '@/lib/actions/formulario';
+import { z } from 'zod';
 
 /**
  * Triage (SPEC §5.4).
@@ -276,4 +278,62 @@ export async function descartar(
   }
 
   return { exito: 'Descartada. No volverá a aparecer aunque se reanalice el mensaje.' };
+}
+
+const accionEvaluarSistema = crearAccion({
+  nombre: 'deteccion.evaluar_sistema',
+  permiso: 'deteccion:review',
+  esquema: z.object({}),
+  revalidar: RUTAS,
+  async ejecutar(_datos, { db, sesion, auditar }) {
+    const resultado = await evaluarEstadoDelSistema(db, sesion.organisation.id);
+
+    auditar({
+      tipo: 'CREACION',
+      accion: 'deteccion.evaluar_sistema',
+      entidad: 'Deteccion',
+      descripcion:
+        `Evaluación del estado del sistema sobre ${String(resultado.contratosRevisados)} contratos: ` +
+        `${String(resultado.creadas)} nuevas, ${String(resultado.actualizadas)} actualizadas`,
+      despues: { ...resultado },
+    });
+
+    return resultado;
+  },
+});
+
+/**
+ * Runs the rules over the tenant's own data.
+ *
+ * Deliberately something a person presses, like analysing a message. It costs
+ * a handful of queries rather than money, but the reason is the same one
+ * recorded for the Claude engine: findings that appear on their own, while
+ * nobody is looking, are findings nobody owns.
+ */
+export async function evaluarSistema(
+  orgSlug: string,
+  _previo: EstadoDetecciones,
+  _formData: FormData,
+): Promise<EstadoDetecciones> {
+  const resultado = await accionEvaluarSistema(orgSlug, {});
+
+  if (!resultado.ok) return aEstado(resultado);
+
+  const { creadas, actualizadas, omitidasPorDescarte, contratosRevisados } = resultado.datos;
+
+  if (creadas === 0 && actualizadas === 0) {
+    return {
+      exito:
+        `Revisados ${String(contratosRevisados)} contratos: nada nuevo que señalar` +
+        (omitidasPorDescarte > 0
+          ? `. ${String(omitidasPorDescarte)} avisos siguen descartados y no se vuelven a levantar.`
+          : '.'),
+    };
+  }
+
+  return {
+    exito:
+      `Revisados ${String(contratosRevisados)} contratos: ${String(creadas)} avisos nuevos y ` +
+      `${String(actualizadas)} actualizados.`,
+  };
 }

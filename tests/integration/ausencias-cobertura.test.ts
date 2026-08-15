@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 
 import { coberturaDeContrato, crearAusencia } from '@/lib/services/personal/ausencias';
+import { evaluarEstadoDelSistema } from '@/lib/services/detecciones/sistema';
 import { crearAdscripcion, crearPlantillaExigida } from '@/lib/services/personal/adscripciones';
 import { crearCategoriaProfesional, crearConvenio } from '@/lib/services/personal/convenios';
 import { crearEmpleado } from '@/lib/services/personal/empleados-escritura';
@@ -59,6 +60,9 @@ describe('ausencias y cobertura real', () => {
           objeto: 'Limpieza viaria',
           tipo: 'SERVICIOS',
           procedimiento: 'ABIERTO',
+          // El motor sólo mira contratos vivos: uno en licitación no tiene a
+          // nadie adscrito y no puede estar infradotado.
+          estado: 'EN_EJECUCION',
         },
         select: { id: true },
       });
@@ -205,6 +209,83 @@ describe('ausencias y cobertura real', () => {
         ),
       ),
     ).rejects.toThrow(/ya tiene otra ausencia/);
+  });
+
+  it('el déficit llega a la cola de detecciones como aviso de sistema', async () => {
+    // La baja de la prueba anterior deja el contrato por debajo del pliego.
+    // Ese cálculo tiene que aparecer en la misma cola que lo detectado en el
+    // correo, con la misma revisión humana y sin abrir nada por su cuenta.
+    const resultado = await tenantTransaction(organisationA, (tx) =>
+      evaluarEstadoDelSistema(tx, organisationA, f('2026-06-05')),
+    );
+
+    expect(resultado.creadas).toBeGreaterThan(0);
+
+    const deteccion = await tenantTransaction(organisationA, (tx) =>
+      tx.deteccion.findFirst({
+        where: { contratoId, tipo: 'INFRADOTACION_PLIEGO' },
+        select: {
+          origen: true,
+          estado: true,
+          confianza: true,
+          comunicacionId: true,
+          datosExtraidos: true,
+          extractos: true,
+        },
+      }),
+    );
+
+    expect(deteccion?.origen).toBe('SISTEMA');
+    // Nace en la cola, no convertida: el motor propone y decide una persona.
+    expect(deteccion?.estado).toBe('NUEVA');
+    // Es aritmética, no inferencia.
+    expect(deteccion?.confianza).toBe(1);
+    // Sin mensaje detrás y sin cita que verificar: la prueba es el cálculo.
+    expect(deteccion?.comunicacionId).toBeNull();
+    expect(deteccion?.extractos).toEqual([]);
+    expect(JSON.stringify(deteccion?.datosExtraidos)).toContain('deficitHoras');
+  });
+
+  it('reevaluar refresca lo pendiente y no resucita lo descartado', async () => {
+    const antes = await tenantTransaction(organisationA, (tx) =>
+      tx.deteccion.count({ where: { contratoId, tipo: 'INFRADOTACION_PLIEGO' } }),
+    );
+
+    // Repetir no apila copias.
+    const segunda = await tenantTransaction(organisationA, (tx) =>
+      evaluarEstadoDelSistema(tx, organisationA, f('2026-06-05')),
+    );
+    expect(segunda.creadas).toBe(0);
+    expect(segunda.actualizadas).toBeGreaterThan(0);
+
+    const despues = await tenantTransaction(organisationA, (tx) =>
+      tx.deteccion.count({ where: { contratoId, tipo: 'INFRADOTACION_PLIEGO' } }),
+    );
+    expect(despues).toBe(antes);
+
+    // Y una vez que alguien lo descarta, no vuelve: repreguntar algo ya
+    // decidido enseña a la gente a cerrar la cola sin leerla.
+    await tenantTransaction(organisationA, (tx) =>
+      tx.deteccion.updateMany({
+        where: { contratoId, tipo: 'INFRADOTACION_PLIEGO' },
+        data: { estado: 'DESCARTADA' },
+      }),
+    );
+
+    const tercera = await tenantTransaction(organisationA, (tx) =>
+      evaluarEstadoDelSistema(tx, organisationA, f('2026-06-05')),
+    );
+
+    expect(tercera.creadas).toBe(0);
+    expect(tercera.omitidasPorDescarte).toBeGreaterThan(0);
+
+    const sigueDescartada = await tenantTransaction(organisationA, (tx) =>
+      tx.deteccion.findFirst({
+        where: { contratoId, tipo: 'INFRADOTACION_PLIEGO' },
+        select: { estado: true },
+      }),
+    );
+    expect(sigueDescartada?.estado).toBe('DESCARTADA');
   });
 
   it('RLS no revela la ausencia a otro tenant aunque conozca el id', async () => {
