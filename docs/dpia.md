@@ -36,6 +36,10 @@
 - Si se usa Anthropic Message Batches: región contractual, conservación
   aplicable, ausencia de Zero Data Retention, DPA y autorización expresa:
 - Plazo de conservación por categoría:
+- Si se activa el módulo de personal: justificar NIF/NSS/CCC, convenio,
+  adscripción, certificaciones, retribución individual y cualquier dato de
+  salud o discapacidad. Usar como inventario técnico
+  `docs/proteccion-datos-personal.md`.
 
 Flujo: proveedor de correo → OAuth de solo lectura → Olbun cifrado → análisis
 local/servicio aprobado → cola humana → expediente, riesgo o incidencia solo si

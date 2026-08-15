@@ -11,11 +11,13 @@ import {
   crearAccionCorrectora,
 } from '@/lib/services/ciclo-riesgos';
 import { crearIncidencia } from '@/lib/services/riesgos';
+import { guardarPersonasImplicadas } from '@/lib/services/personal/incidencias-sensibles';
 import {
   accionCorrectoraSchema,
   actualizarAccionCorrectoraSchema,
   actualizarIncidenciaSchema,
   incidenciaSchema,
+  personasImplicadasSchema,
 } from '@/lib/validation/riesgos';
 
 export interface EstadoIncidencias {
@@ -95,6 +97,35 @@ const accionActualizar = crearAccion({
         notificadaAAutoridad: datos.notificadaAAutoridad,
         referenciaAutoridad: datos.referenciaAutoridad,
       },
+    });
+    return incidencia;
+  },
+});
+
+const accionPersonasImplicadas = crearAccion({
+  nombre: 'incidencia.personas_implicadas.guardar',
+  permiso: 'incidencia:view_sensitive',
+  esquema: personasImplicadasSchema,
+  revalidar: ['/:orgSlug/incidencias'],
+  async ejecutar(datos, { db, sesion, auditar }) {
+    const existente = await incidenciaAutorizada(db, sesion, datos.incidenciaId);
+    assertCan(sesion.actor, 'incidencia:view_sensitive', {
+      organisationId: sesion.organisation.id,
+      id: existente.id,
+      contratoId: existente.contratoId,
+    });
+    const incidencia = await guardarPersonasImplicadas(
+      db,
+      datos.incidenciaId,
+      datos.personasImplicadas,
+    );
+    auditar({
+      tipo: 'MODIFICACION',
+      accion: 'incidencia.personas_implicadas.guardar',
+      entidad: 'Incidencia',
+      entidadId: incidencia.id,
+      descripcion: `${incidencia.referencia} — datos protegidos actualizados`,
+      despues: { personasImplicadas: '[CIFRADO]' },
     });
     return incidencia;
   },
@@ -191,6 +222,20 @@ export async function actualizar(
   });
   return resultado.ok
     ? { exito: `${resultado.datos.referencia} actualizada a ${resultado.datos.estado}.` }
+    : aEstado(resultado);
+}
+
+export async function guardarPersonas(
+  orgSlug: string,
+  _previo: EstadoIncidencias,
+  formData: FormData,
+) {
+  const resultado = await accionPersonasImplicadas(orgSlug, {
+    incidenciaId: texto(formData, 'incidenciaId'),
+    personasImplicadas: texto(formData, 'personasImplicadas'),
+  });
+  return resultado.ok
+    ? { exito: 'Datos protegidos guardados y cifrados.' }
     : aEstado(resultado);
 }
 

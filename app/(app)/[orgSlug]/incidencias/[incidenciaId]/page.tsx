@@ -2,12 +2,19 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
-import { actualizar, actualizarCorrectora, crearCorrectora } from '../acciones';
+import {
+  actualizar,
+  actualizarCorrectora,
+  crearCorrectora,
+  guardarPersonas,
+} from '../acciones';
 import { can } from '@/lib/auth/can';
 import { requirePermission } from '@/lib/auth/guardias';
 import { AccionesCorrectoras } from '@/components/features/riesgos/acciones-correctoras';
 import { FormularioInvestigacion } from '@/components/features/riesgos/formulario-investigacion';
+import { PersonasImplicadas } from '@/components/features/riesgos/personas-implicadas';
 import { tenantClient } from '@/lib/db/tenant';
+import { obtenerPersonasImplicadas } from '@/lib/services/personal/incidencias-sensibles-lectura';
 
 export const metadata: Metadata = { title: 'Detalle de la incidencia' };
 
@@ -71,6 +78,10 @@ export default async function IncidenciaDetallePage({
   };
   if (!can(contexto.actor, 'incidencia:view', recurso)) notFound();
   const puedeGestionar = can(contexto.actor, 'incidencia:update', recurso);
+  const puedeVerPersonas = can(contexto.actor, 'incidencia:view_sensitive', recurso);
+  const personasImplicadas = puedeVerPersonas
+    ? await obtenerPersonasImplicadas(orgSlug, incidencia.id)
+    : null;
   const personas = membresias.map(({ user }) => ({ id: user.id, nombre: user.name }));
   const nombres = new Map(personas.map((persona) => [persona.id, persona.nombre]));
 
@@ -175,6 +186,15 @@ export default async function IncidenciaDetallePage({
             <p className="mt-2 text-sm">{incidencia.leccionesAprendidas ?? 'Pendiente'}</p>
           </div>
         </section>
+      ) : null}
+
+      {puedeVerPersonas ? (
+        <PersonasImplicadas
+          incidenciaId={incidencia.id}
+          texto={personasImplicadas}
+          editable={puedeGestionar}
+          accion={guardarPersonas.bind(null, orgSlug)}
+        />
       ) : null}
 
       {puedeGestionar ? (

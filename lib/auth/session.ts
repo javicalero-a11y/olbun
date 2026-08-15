@@ -62,6 +62,14 @@ export const getSessionContext = cache(
       select: { role: true, organisation: { select: { slug: true, name: true } } },
       orderBy: { organisation: { name: 'asc' } },
     });
+    const contratosGestionados = await db.contrato.findMany({
+      where: {
+        organisationId: membership.organisation.id,
+        responsableInternoId: membership.user.id,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
 
     return {
       actor: {
@@ -69,9 +77,7 @@ export const getSessionContext = cache(
         organisationId: membership.organisation.id,
         role: membership.role,
         status: membership.status,
-        // Populated from the contract module in M4; until then no contracts
-        // exist, so scoped roles legitimately reach nothing.
-        contratoIds: [],
+        contratoIds: contratosGestionados.map((contrato) => contrato.id),
         grants: [],
       },
       organisation: membership.organisation,

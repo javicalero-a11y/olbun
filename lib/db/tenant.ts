@@ -65,6 +65,15 @@ const TENANT_OWNED = new Set<string>([
   'TipoDocumento',
   'Documento',
   'VersionDocumento',
+  'ConvenioColectivo',
+  'ContratoConvenio',
+  'CategoriaProfesional',
+  'TablaSalarial',
+  'Empleado',
+  'PlantillaExigida',
+  'AdscripcionContrato',
+  'TipoCertificacion',
+  'CertificacionEmpleado',
 ]);
 
 /** Exported so a test can assert it covers every model carrying organisationId. */

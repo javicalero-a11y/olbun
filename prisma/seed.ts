@@ -5,6 +5,7 @@ import { CALENDARIOS_SEMILLA } from './calendarios';
 import { sembrarDemo } from './demo';
 import { sembrarDocumentosDemo } from './documentos-demo';
 import { sembrarRiesgosDemo } from './riesgos-demo';
+import { sembrarPersonalDemo } from './personal-demo';
 
 /**
  * Semilla del tenant de demostración.
@@ -87,6 +88,7 @@ async function main(): Promise<void> {
   await sembrarDemo(prisma, organisation.id);
   const totalDocumentos = await sembrarDocumentosDemo(prisma, organisation.id);
   const riesgos = await sembrarRiesgosDemo(prisma, organisation.id);
+  const personal = await sembrarPersonalDemo(prisma, organisation.id);
   const totalContratos = await prisma.contrato.count({
     where: { organisationId: organisation.id },
   });
@@ -94,6 +96,9 @@ async function main(): Promise<void> {
   console.log(`Documentos de demostración: ${String(totalDocumentos)}`);
   console.log(
     `Riesgos e incidencias de demostración: ${String(riesgos.riesgos)} + ${String(riesgos.incidencias)}`,
+  );
+  console.log(
+    `Personal de demostración: ${String(personal.empleados)} personas y ${String(personal.certificaciones)} certificados`,
   );
 
   const totalFestivos = await prisma.festivo.count();

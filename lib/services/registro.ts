@@ -4,6 +4,7 @@ import { identityClientBecause } from '@/lib/db/tenant';
 import { sembrarPlantillasDelSistema } from './plantillas';
 import { sembrarTiposDocumento } from './documentos';
 import { sembrarConfiguracionRiesgos } from './configuracion-riesgos';
+import { sembrarTiposCertificacion } from './personal/certificaciones';
 import { hashPassword } from '@/lib/auth/password';
 import { uniqueSlug } from '@/lib/domain/slug';
 import { logger } from '@/lib/logger';
@@ -72,6 +73,7 @@ export async function registrarOrganizacion(input: SignUpInput): Promise<Registr
     await sembrarPlantillasDelSistema(tx, organisation.id);
     await sembrarTiposDocumento(tx, organisation.id);
     await sembrarConfiguracionRiesgos(tx, organisation.id);
+    await sembrarTiposCertificacion(tx, organisation.id, user.id);
 
     return { user, organisation };
   });

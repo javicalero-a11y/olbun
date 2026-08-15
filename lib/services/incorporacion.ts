@@ -5,6 +5,8 @@ import type { Role } from '@prisma/client';
 import { identityClientBecause } from '@/lib/db/tenant';
 import { sembrarPlantillasDelSistema } from './plantillas';
 import { sembrarConfiguracionRiesgos } from './configuracion-riesgos';
+import { sembrarTiposDocumento } from './documentos';
+import { sembrarTiposCertificacion } from './personal/certificaciones';
 import { uniqueSlug } from '@/lib/domain/slug';
 import { logger } from '@/lib/logger';
 
@@ -183,7 +185,9 @@ export async function crearOrganizacionPara(
     });
 
     await sembrarPlantillasDelSistema(tx, organisation.id);
+    await sembrarTiposDocumento(tx, organisation.id);
     await sembrarConfiguracionRiesgos(tx, organisation.id);
+    await sembrarTiposCertificacion(tx, organisation.id, userId);
 
     const nombre = datos.nombre?.trim();
     if (nombre) {

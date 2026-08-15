@@ -7,7 +7,7 @@ const valid = {
   DATABASE_URL: 'postgresql://olbun_app:secret@localhost:5433/olbun',
   DIRECT_DATABASE_URL: 'postgresql://olbun:olbun@localhost:5433/olbun',
   AUTH_SECRET: 'x'.repeat(32),
-  ENCRYPTION_KEY: 'y'.repeat(44),
+  ENCRYPTION_KEY: Buffer.alloc(32, 4).toString('base64'),
 } satisfies Record<string, string | undefined>;
 
 describe('parseServerEnv', () => {
@@ -41,6 +41,25 @@ describe('parseServerEnv', () => {
 
   it('throws when LOG_LEVEL is outside the allowed set', () => {
     expect(() => parseServerEnv({ ...valid, LOG_LEVEL: 'verbose' })).toThrowError(/LOG_LEVEL/);
+  });
+
+  it('rejects malformed current and retired encryption keys', () => {
+    expect(() => parseServerEnv({ ...valid, ENCRYPTION_KEY: 'y'.repeat(44) })).toThrowError(
+      /ENCRYPTION_KEY/,
+    );
+    expect(() =>
+      parseServerEnv({ ...valid, ENCRYPTION_PREVIOUS_KEYS: 'not-a-key' }),
+    ).toThrowError(/ENCRYPTION_PREVIOUS_KEYS/);
+  });
+
+  it('accepts multiple valid retired encryption keys during a rotation', () => {
+    const claves = [Buffer.alloc(32, 5), Buffer.alloc(32, 6)]
+      .map((clave) => clave.toString('base64'))
+      .join(',');
+
+    expect(
+      parseServerEnv({ ...valid, ENCRYPTION_PREVIOUS_KEYS: claves }).ENCRYPTION_PREVIOUS_KEYS,
+    ).toBe(claves);
   });
 
   it('labels a root-level failure rather than printing an empty path', () => {

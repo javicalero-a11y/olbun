@@ -67,6 +67,7 @@ export const PERMISSIONS = [
   'incidencia:view',
   'incidencia:create',
   'incidencia:update',
+  'incidencia:view_sensitive',
   'riesgo:view',
   'riesgo:manage',
 
@@ -184,6 +185,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'deteccion:view',
     'deteccion:review',
     'incidencia:view',
+    'incidencia:view_sensitive',
     'riesgo:view',
     'riesgo:manage',
     'empleado:view',
@@ -237,6 +239,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'contrato:view',
     'expediente:view',
     'incidencia:view',
+    'incidencia:view_sensitive',
     'empleado:view',
     'empleado:manage',
     'empleado:view_sensitive',
@@ -304,6 +307,7 @@ export function isScopedRole(role: Role): role is ScopedRole {
 /** Permissions that additionally log a VIEW audit event on every read (SPEC §7.3). */
 export const SENSITIVE_PERMISSIONS: readonly Permission[] = [
   'empleado:view_sensitive',
+  'incidencia:view_sensitive',
   'nomina:view',
   'audit:export',
 ];

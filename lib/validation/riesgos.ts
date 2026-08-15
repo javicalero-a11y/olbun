@@ -91,6 +91,15 @@ export const actualizarIncidenciaSchema = z.object({
   referenciaAutoridad: opcional(200),
 });
 
+export const personasImplicadasSchema = z.object({
+  incidenciaId: id,
+  personasImplicadas: z
+    .string()
+    .trim()
+    .min(3, 'Describe únicamente los datos necesarios para investigar el hecho.')
+    .max(4000, 'Como mucho 4.000 caracteres.'),
+});
+
 export const riesgoSchema = z.object({
   categoriaId: id,
   causa: z.string().trim().min(3, 'Di qué lo provoca.').max(500),

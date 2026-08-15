@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const esClaveAes256Base64 = (valor: string): boolean => {
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(valor)) return false;
+  return Buffer.from(valor, 'base64').byteLength === 32;
+};
+
 /**
  * Environment validation (SPEC §7.4: "Secrets from env only, validated at boot
  * with Zod — the app refuses to start with a missing or malformed secret").
@@ -26,7 +31,23 @@ const serverSchema = z.object({
    * 32 bytes, base64. Encrypts TOTP secrets and, from M11, personal data.
    * Rotating it changes the key id embedded in every new ciphertext.
    */
-  ENCRYPTION_KEY: z.string().min(44, 'ENCRYPTION_KEY must be 32 bytes encoded as base64'),
+  ENCRYPTION_KEY: z
+    .string()
+    .refine(esClaveAes256Base64, 'ENCRYPTION_KEY must be exactly 32 bytes encoded as base64'),
+
+  /** Comma-separated retired keys kept temporarily readable during rotation. */
+  ENCRYPTION_PREVIOUS_KEYS: z
+    .string()
+    .refine(
+      (valor) =>
+        valor
+          .split(',')
+          .map((clave) => clave.trim())
+          .filter(Boolean)
+          .every(esClaveAes256Base64),
+      'ENCRYPTION_PREVIOUS_KEYS must contain comma-separated 32-byte base64 keys',
+    )
+    .optional(),
 
   /** Canonical origin of the app, used for links in emails and redirects. */
   APP_URL: z.url().default('http://localhost:3100'),

@@ -133,6 +133,15 @@ model Organisation {
   tiposDocumento        TipoDocumento[]
   documentos            Documento[]
   versionesDocumento    VersionDocumento[]
+  conveniosColectivos   ConvenioColectivo[]
+  categoriasProfesional CategoriaProfesional[]
+  tablasSalariales      TablaSalarial[]
+  empleados             Empleado[]
+  conveniosContrato     ContratoConvenio[]
+  adscripcionesContrato AdscripcionContrato[]
+  plantillasExigidas    PlantillaExigida[]
+  tiposCertificacion    TipoCertificacion[]
+  certificaciones       CertificacionEmpleado[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -606,11 +615,15 @@ model Contrato {
   modificados      Modificado[]
   expedientes      Expediente[]
 
-  buzones        BuzonConectado[]
-  comunicaciones Comunicacion[]
-  incidencias    Incidencia[]
-  riesgos        Riesgo[]
-  documentos     Documento[]
+  buzones                    BuzonConectado[]
+  comunicaciones             Comunicacion[]
+  incidencias                Incidencia[]
+  riesgos                    Riesgo[]
+  documentos                 Documento[]
+  convenios                  ContratoConvenio[]
+  adscripciones              AdscripcionContrato[]
+  plantillaExigida           PlantillaExigida[]
+  empleadosOrigenSubrogacion Empleado[]            @relation("ContratoOrigenSubrogacion")
 
   @@unique([organisationId, numeroExpediente])
   @@index([organisationId, estado])
@@ -1451,10 +1464,9 @@ enum EstadoIncidencia {
 /// existed *before* anybody was arguing about it. `expedienteId` is the link
 /// for when one escalates.
 ///
-/// `personasImplicadas` holds names and roles of people involved — Article 9
-/// data when the incident is an accident or an assault. It is encrypted at
-/// rest by the application (M11's key), and until that lands it stays null
-/// rather than being written in clear.
+/// `personasImplicadas` holds an AES-256-GCM envelope, never plaintext. It can
+/// contain Article 9 data after an accident or assault, so reads require an
+/// additional permission and always emit an audit event.
 model Incidencia {
   id             String @id @default(cuid(2))
   organisationId String
@@ -1480,7 +1492,7 @@ model Incidencia {
   leccionesAprendidas String?
   fechaCierre         DateTime? @db.Date
 
-  /// JSONB, encrypted by the application. Null until M11 provides the key.
+  /// JSONB envelope `{ version, cifrado }`; the decrypted payload never enters Prisma.
   personasImplicadas Json?
 
   /// Told the contracting authority. A penalty for late notice usually turns
@@ -1924,13 +1936,15 @@ model Documento {
   restoredAt    DateTime?
   restoredById  String?
 
-  organisation    Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  tipo            TipoDocumento?     @relation(fields: [tipoId], references: [id], onDelete: SetNull)
-  contrato        Contrato?          @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  expediente      Expediente?        @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
-  incidencia      Incidencia?        @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+  organisation    Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  tipo            TipoDocumento?          @relation(fields: [tipoId], references: [id], onDelete: SetNull)
+  contrato        Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  expediente      Expediente?             @relation(fields: [expedienteId], references: [id], onDelete: SetNull)
+  incidencia      Incidencia?             @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
   versiones       VersionDocumento[]
-  buzonesPolitica BuzonConectado[]   @relation("PoliticaBuzon")
+  buzonesPolitica BuzonConectado[]        @relation("PoliticaBuzon")
+  conveniosFuente ConvenioColectivo[]     @relation("ConvenioDocumento")
+  certificaciones CertificacionEmpleado[] @relation("CertificacionDocumento")
 
   @@index([organisationId, createdAt])
   @@index([organisationId, deletedAt, createdAt])
@@ -1988,4 +2002,361 @@ model VersionDocumento {
   @@unique([documentoId, numero])
   @@index([organisationId, sha256])
   @@map("versiones_documento")
+}
+
+// ---------------------------------------------------------------------------
+// M11 — Personal, convenio y adscripción
+// ---------------------------------------------------------------------------
+
+enum AmbitoConvenio {
+  ESTATAL
+  AUTONOMICO
+  PROVINCIAL
+  EMPRESA
+  CENTRO
+}
+
+enum EstadoEmpleado {
+  ACTIVO
+  EXCEDENCIA
+  BAJA
+  FINALIZADO
+}
+
+enum MotivoReduccionJornada {
+  GUARDA_LEGAL
+  LACTANCIA
+  CUIDADO_FAMILIAR
+  OTRO
+}
+
+enum FuentePlantillaExigida {
+  PCAP
+  PPT
+  OFERTA
+  MODIFICADO
+}
+
+enum TurnoTrabajo {
+  MANANA
+  TARDE
+  NOCHE
+  PARTIDO
+  ROTATIVO
+  OTRO
+}
+
+enum EstadoCertificacion {
+  VALIDA
+  PROXIMA_A_CADUCAR
+  CADUCADA
+  PENDIENTE_RENOVACION
+  REVOCADA
+}
+
+/// Public collective agreement metadata and its effective period. Salary
+/// tables are versioned children: changing a published amount creates a new
+/// effective row instead of rewriting the basis used by an earlier decision.
+model ConvenioColectivo {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  nombre           String
+  ambito           AmbitoConvenio
+  sector           String
+  provincia        String?
+  codigoBoletin    String?
+  fechaPublicacion DateTime?      @db.Date
+  vigenciaDesde    DateTime       @db.Date
+  vigenciaHasta    DateTime?      @db.Date
+  enUltraactividad Boolean        @default(false)
+  urlBoletin       String?
+  documentoId      String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  documento    Documento?             @relation("ConvenioDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
+  categorias   CategoriaProfesional[]
+  tablas       TablaSalarial[]
+  contratos    ContratoConvenio[]
+  empleados    Empleado[]
+
+  @@index([organisationId, sector, vigenciaDesde])
+  @@index([organisationId, deletedAt])
+  @@index([documentoId])
+  @@map("convenios_colectivos")
+}
+
+model ContratoConvenio {
+  id             String @id @default(cuid(2))
+  organisationId String
+  contratoId     String
+  convenioId     String
+
+  esPrincipal   Boolean   @default(false)
+  vigenciaDesde DateTime? @db.Date
+  vigenciaHasta DateTime? @db.Date
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato     Contrato          @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  convenio     ConvenioColectivo @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+
+  @@unique([contratoId, convenioId, vigenciaDesde])
+  @@index([organisationId, contratoId])
+  @@index([organisationId, convenioId])
+  @@map("contratos_convenios")
+}
+
+model CategoriaProfesional {
+  id             String @id @default(cuid(2))
+  organisationId String
+  convenioId     String
+
+  grupo             String
+  nivel             String?
+  denominacion      String
+  grupoCotizacionSS Int
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation  Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  convenio      ConvenioColectivo     @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+  tablas        TablaSalarial[]
+  empleados     Empleado[]
+  adscripciones AdscripcionContrato[]
+  plantillas    PlantillaExigida[]
+
+  @@unique([convenioId, grupo, nivel])
+  @@index([organisationId, convenioId])
+  @@index([organisationId, denominacion])
+  @@map("categorias_profesionales")
+}
+
+model TablaSalarial {
+  id             String @id @default(cuid(2))
+  organisationId String
+  convenioId     String
+  categoriaId    String
+
+  ano                 Int
+  salarioBaseMensual  Decimal  @db.Decimal(12, 2)
+  numeroPagas         Int
+  jornadaAnualHoras   Decimal  @db.Decimal(8, 2)
+  precioHoraOrdinaria Decimal  @db.Decimal(12, 4)
+  precioHoraExtra     Decimal? @db.Decimal(12, 4)
+  vigenciaDesde       DateTime @db.Date
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  convenio     ConvenioColectivo    @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+  categoria    CategoriaProfesional @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaId, ano, vigenciaDesde])
+  @@index([organisationId, convenioId, ano])
+  @@index([organisationId, categoriaId, ano])
+  @@map("tablas_salariales")
+}
+
+/// Employee directory data is deliberately split from protected fields. The
+/// encrypted payloads hold NIF/NSS/CCC and individual remuneration or Article
+/// 9 facts; list screens never need to decrypt them.
+model Empleado {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  numeroEmpleado String
+  nombre         String
+  apellidos      String
+  email          String?
+  telefono       String?
+  puesto         String?
+  estado         EstadoEmpleado @default(ACTIVO)
+  fechaAlta      DateTime       @db.Date
+  fechaBaja      DateTime?      @db.Date
+
+  nifHash                     String?
+  datosIdentificacionCifrados String?
+  datosLaboralesCifrados      String?
+
+  categoriaId                 String?
+  convenioId                  String?
+  codigoContratoSEPE          String?
+  grupoCotizacion             Int?
+  jornadaPorcentaje           Decimal  @default(100) @db.Decimal(5, 2)
+  horasSemanales              Decimal  @db.Decimal(6, 2)
+  antiguedadReconocida        DateTime @db.Date
+  esSubrogado                 Boolean  @default(false)
+  contratoOrigenSubrogacionId String?
+  tieneReduccionJornada       Boolean  @default(false)
+  esRepresentanteTrabajadores Boolean  @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation              Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  categoria                 CategoriaProfesional?   @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  convenio                  ConvenioColectivo?      @relation(fields: [convenioId], references: [id], onDelete: SetNull)
+  contratoOrigenSubrogacion Contrato?               @relation("ContratoOrigenSubrogacion", fields: [contratoOrigenSubrogacionId], references: [id], onDelete: SetNull)
+  adscripciones             AdscripcionContrato[]
+  certificaciones           CertificacionEmpleado[]
+
+  @@unique([organisationId, numeroEmpleado])
+  @@unique([organisationId, nifHash])
+  @@index([organisationId, estado, apellidos])
+  @@index([organisationId, convenioId])
+  @@index([organisationId, categoriaId])
+  @@index([contratoOrigenSubrogacionId])
+  @@map("empleados")
+}
+
+model PlantillaExigida {
+  id             String @id @default(cuid(2))
+  organisationId String
+  contratoId     String
+  categoriaId    String
+
+  centroTrabajo     String
+  numeroPersonas    Int
+  horasSemanales    Decimal                @db.Decimal(8, 2)
+  fuente            FuentePlantillaExigida
+  clausula          String
+  esVinculante      Boolean                @default(true)
+  penalidadAsociada Json?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  contrato     Contrato             @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  categoria    CategoriaProfesional @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, contratoId, centroTrabajo])
+  @@index([organisationId, categoriaId])
+  @@map("plantillas_exigidas")
+}
+
+model AdscripcionContrato {
+  id             String @id @default(cuid(2))
+  organisationId String
+  empleadoId     String
+  contratoId     String
+  categoriaId    String
+
+  centroTrabajo        String
+  horasSemanales       Decimal      @db.Decimal(6, 2)
+  porcentajeDedicacion Decimal      @db.Decimal(5, 2)
+  fechaAlta            DateTime     @db.Date
+  fechaBaja            DateTime?    @db.Date
+  esPersonalClave      Boolean      @default(false)
+  turno                TurnoTrabajo @default(MANANA)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  empleado     Empleado             @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  contrato     Contrato             @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  categoria    CategoriaProfesional @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  @@unique([empleadoId, contratoId, fechaAlta])
+  @@index([organisationId, contratoId, fechaBaja])
+  @@index([organisationId, empleadoId, fechaBaja])
+  @@index([organisationId, categoriaId])
+  @@map("adscripciones_contrato")
+}
+
+model TipoCertificacion {
+  id             String @id @default(cuid(2))
+  organisationId String
+
+  codigo                 String
+  nombre                 String
+  periodoRenovacionMeses Int?
+  diasAviso              Int     @default(90)
+  esObligatoria          Boolean @default(false)
+  isActive               Boolean @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation    Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  certificaciones CertificacionEmpleado[]
+
+  @@unique([organisationId, codigo])
+  @@index([organisationId, isActive, nombre])
+  @@map("tipos_certificacion")
+}
+
+model CertificacionEmpleado {
+  id             String @id @default(cuid(2))
+  organisationId String
+  empleadoId     String
+  tipoId         String
+
+  referenciaCifrada String?
+  emitidaPor        String?
+  fechaEmision      DateTime?           @db.Date
+  fechaCaducidad    DateTime?           @db.Date
+  estado            EstadoCertificacion @default(VALIDA)
+  documentoId       String?
+  verificadaPorId   String?
+  verificadaEn      DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+  deletedAt   DateTime?
+  deletedById String?
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  empleado     Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  tipo         TipoCertificacion @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  documento    Documento?        @relation("CertificacionDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
+
+  @@index([organisationId, estado, fechaCaducidad])
+  @@index([organisationId, empleadoId])
+  @@index([organisationId, tipoId])
+  @@index([documentoId])
+  @@map("certificaciones_empleado")
 }

@@ -1,8 +1,6 @@
 import 'server-only';
 
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-
-import { serverEnv } from '@/lib/env';
+export { cifrar, descifrar } from '@/lib/crypto/cifrado-nucleo';
 
 /**
  * Authenticated encryption for fields that must not be readable in a database
@@ -20,66 +18,3 @@ import { serverEnv } from '@/lib/env';
  * encryption with a KMS-held master key is M23 (hardening), and the format
  * above is what makes that migration possible without a full re-encrypt.
  */
-
-const VERSION = 'v1';
-const IV_BYTES = 12;
-
-interface Clave {
-  id: string;
-  material: Buffer;
-}
-
-function claveActual(): Clave {
-  const raw = serverEnv().ENCRYPTION_KEY;
-  const material = Buffer.from(raw, 'base64');
-
-  if (material.length !== 32) {
-    throw new Error('ENCRYPTION_KEY debe ser de 32 bytes codificados en base64');
-  }
-
-  // Key identifier derived from the key itself, so rotating the environment
-  // variable automatically changes the id without a separate register.
-  const id = material.subarray(0, 4).toString('hex');
-
-  return { id, material };
-}
-
-export function cifrar(textoPlano: string): string {
-  const { id, material } = claveActual();
-  const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv('aes-256-gcm', material, iv);
-
-  const cifrado = Buffer.concat([cipher.update(textoPlano, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return [
-    VERSION,
-    id,
-    iv.toString('base64url'),
-    tag.toString('base64url'),
-    cifrado.toString('base64url'),
-  ].join('.');
-}
-
-export function descifrar(valor: string): string {
-  const partes = valor.split('.');
-
-  if (partes.length !== 5 || partes[0] !== VERSION) {
-    throw new Error('Valor cifrado con formato desconocido');
-  }
-
-  const [, , ivB64, tagB64, cifradoB64] = partes;
-
-  if (!ivB64 || !tagB64 || cifradoB64 === undefined) {
-    throw new Error('Valor cifrado incompleto');
-  }
-
-  const { material } = claveActual();
-  const decipher = createDecipheriv('aes-256-gcm', material, Buffer.from(ivB64, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tagB64, 'base64url'));
-
-  return Buffer.concat([
-    decipher.update(Buffer.from(cifradoB64, 'base64url')),
-    decipher.final(),
-  ]).toString('utf8');
-}

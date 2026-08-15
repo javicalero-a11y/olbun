@@ -24,6 +24,7 @@ export const SECCIONES = [
   { titulo: 'Detecciones', ruta: 'detecciones' },
   { titulo: 'Incidencias', ruta: 'incidencias' },
   { titulo: 'Riesgos', ruta: 'riesgos' },
+  { titulo: 'Personal', ruta: 'personal' },
   { titulo: 'Documentos', ruta: 'documentos' },
 ];
 

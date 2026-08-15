@@ -11,6 +11,40 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M11 — Personal, convenio y adscripción (implementado; cierre técnico pendiente, 2026-08-14)
+
+- Directorio de personal con alta, estado laboral, jornada, antigüedad,
+  subrogación, categoría profesional y convenio aplicable. Los listados no
+  descifran datos protegidos.
+- Convenios colectivos, categorías y tablas salariales versionadas por año y
+  vigencia. El precio de hora ordinaria se calcula como regla de dominio y el
+  convenio aplicable se vincula expresamente a cada contrato.
+- Plantilla mínima exigida por pliego y adscripción por contrato, centro,
+  categoría, turno, horas y porcentaje. Se advierte al superar el 100 % y se
+  bloquea una carga solapada superior al 150 %.
+- Cobertura base compara horas exigidas y adscritas sin ocultar déficits. Las
+  bajas, vacaciones y fichajes se descontarán en M12, por lo que la pantalla
+  etiqueta expresamente el cálculo actual como base estática.
+- Tipos y matriz de certificaciones con caducidad calculada por día civil en la
+  zona de la organización. El alta de una organización incorpora tipos
+  iniciales útiles.
+- NIF/NIE, afiliación, CCC, complemento individual, discapacidad reconocida,
+  referencias de certificados y personas implicadas en incidencias se guardan
+  con AES-256-GCM. El NIF usa un índice ciego HMAC para detectar duplicados sin
+  texto claro; cada lectura protegida exige permiso específico y genera un
+  evento de auditoría.
+- Rotación de claves operable con `ENCRYPTION_PREVIOUS_KEYS`: las claves
+  retiradas permanecen temporalmente legibles, las escrituras usan solo la
+  vigente y la validación de arranque rechaza material que no sea AES-256.
+- Demo ampliada con 46 personas ficticias, cinco convenios con categorías y
+  tablas, adscripciones y mínimos contractuales con déficits visibles, y 46
+  certificaciones repartidas entre válidas, próximas y caducadas.
+- ADR 0012, inventario de protección de datos y seis pruebas de integración
+  con Postgres documentan cifrado, aislamiento RLS y decisiones de modelado.
+  TypeScript, ESLint, Prettier, Prisma y 1.306 pruebas sin acceso de red local
+  están verdes. El cierre queda pendiente de repetir la suite E2E y los tests
+  MinIO/ClamAV cuando el entorno de Codex recupere permiso para puertos locales.
+
 ## M10 — Riesgos e incidencias (completo, 2026-08-14)
 
 - Registro vivo ordenado por exposición vigente y matriz interactiva 5×5 con

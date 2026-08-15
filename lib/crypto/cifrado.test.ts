@@ -74,4 +74,25 @@ describe('cifrar / descifrar', () => {
     expect(() => descifrar('esto-no-va-cifrado')).toThrow(/formato desconocido/);
     expect(() => descifrar('v2.aaaaaaaa.a.a.a')).toThrow(/formato desconocido/);
   });
+
+  it('lee con una clave anterior durante una rotación', () => {
+    const anterior = Buffer.alloc(32, 11).toString('base64');
+    const nueva = Buffer.alloc(32, 12).toString('base64');
+    try {
+      process.env['ENCRYPTION_KEY'] = anterior;
+      delete process.env['ENCRYPTION_PREVIOUS_KEYS'];
+      resetServerEnvCache();
+      const valorAnterior = cifrar('dato anterior a la rotación');
+
+      process.env['ENCRYPTION_KEY'] = nueva;
+      process.env['ENCRYPTION_PREVIOUS_KEYS'] = anterior;
+      resetServerEnvCache();
+      expect(descifrar(valorAnterior)).toBe('dato anterior a la rotación');
+      expect(cifrar('dato nuevo').split('.')[1]).not.toBe(valorAnterior.split('.')[1]);
+    } finally {
+      process.env['ENCRYPTION_KEY'] = Buffer.alloc(32, 7).toString('base64');
+      delete process.env['ENCRYPTION_PREVIOUS_KEYS'];
+      resetServerEnvCache();
+    }
+  });
 });
