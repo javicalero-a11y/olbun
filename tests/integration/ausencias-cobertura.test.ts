@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { coberturaDeContrato, crearAusencia } from '@/lib/services/personal/ausencias';
 import { evaluarEstadoDelSistema } from '@/lib/services/detecciones/sistema';
+import { planificadorDeContrato } from '@/lib/services/personal/planificador';
 import { crearAdscripcion, crearPlantillaExigida } from '@/lib/services/personal/adscripciones';
 import { crearCategoriaProfesional, crearConvenio } from '@/lib/services/personal/convenios';
 import { crearEmpleado } from '@/lib/services/personal/empleados-escritura';
@@ -286,6 +287,65 @@ describe('ausencias y cobertura real', () => {
       }),
     );
     expect(sigueDescartada?.estado).toBe('DESCARTADA');
+  });
+
+  it('el planificador enseña la semana de la baja y deja el resto cubierto', async () => {
+    // La rejilla es la vista de planificación de la misma verdad: donde la
+    // cobertura dice «faltan horas en junio», el planificador dice en qué
+    // semana concreta y por qué.
+    const plan = await tenantTransaction(organisationA, (tx) =>
+      planificadorDeContrato(tx, contratoId, {
+        desde: f('2026-06-01'),
+        hasta: f('2026-06-14'),
+      }),
+    );
+
+    expect(plan.sinPlantilla).toBe(false);
+    expect(plan.semanas).toHaveLength(2);
+    expect(plan.filas).toHaveLength(1);
+
+    const fila = plan.filas[0];
+    expect(fila?.nombre).toContain('Vega');
+
+    // Semana del 1 de junio: la baja de dos días se lleva 16 de las 40 horas.
+    expect(fila?.celdas[0]?.comprometidas).toBe(40);
+    expect(fila?.celdas[0]?.ausentes).toBe(16);
+    expect(fila?.celdas[0]?.disponibles).toBe(24);
+    expect(fila?.celdas[0]?.estado).toBe('AUSENTE');
+    expect(fila?.celdas[0]?.motivos).toContain('IT por contingencia común');
+
+    // La semana siguiente no arrastra nada.
+    expect(fila?.celdas[1]?.estado).toBe('CUBIERTO');
+    expect(fila?.celdas[1]?.disponibles).toBe(40);
+    expect(fila?.tieneSobreasignacion).toBe(false);
+  });
+
+  it('sin nadie adscrito lo dice, en vez de enseñar una rejilla vacía', async () => {
+    const otro = await tenantTransaction(organisationA, async (tx) => {
+      const poder = await tx.poderAdjudicador.findFirst({ select: { id: true } });
+      const contrato = await tx.contrato.create({
+        data: {
+          organisationId: organisationA,
+          poderAdjudicadorId: poder?.id ?? '',
+          numeroExpediente: `VACIO-${suffix}`,
+          objeto: 'Contrato sin plantilla',
+          tipo: 'SERVICIOS',
+          procedimiento: 'ABIERTO',
+          estado: 'EN_EJECUCION',
+        },
+        select: { id: true },
+      });
+      return contrato.id;
+    });
+
+    const plan = await tenantTransaction(organisationA, (tx) =>
+      planificadorDeContrato(tx, otro, { desde: f('2026-06-01'), hasta: f('2026-06-14') }),
+    );
+
+    expect(plan.sinPlantilla).toBe(true);
+    expect(plan.filas).toEqual([]);
+    // Y no se inventa una proyección sobre cero horas.
+    expect(plan.proyeccion.fiable).toBe(false);
   });
 
   it('RLS no revela la ausencia a otro tenant aunque conozca el id', async () => {

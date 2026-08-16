@@ -121,3 +121,30 @@ test.describe('Ausencias', () => {
     await expect(page.getByText(/ya tiene otra ausencia/)).toBeVisible();
   });
 });
+
+test.describe('Planificador de cobertura', () => {
+  test('sin contratos vivos explica para qué sirve en vez de enseñar una rejilla vacía', async ({
+    page,
+  }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/personal/planificador`);
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Planificador de cobertura',
+    );
+    await expect(page.getByText('No hay contratos en ejecución')).toBeVisible();
+  });
+
+  test('se llega desde Personal y dice que la rejilla se lee, no se arrastra', async ({
+    page,
+  }) => {
+    const cred = await registrar(page);
+    await page.goto(`/${cred.slug}/personal`);
+    await page.getByRole('link', { name: 'Planificador' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/${cred.slug}/personal/planificador$`));
+    // Arrastrar exige equivalente por teclado (WCAG 2.2 AA 2.5.7): la pantalla
+    // dice por qué no lo hay en vez de dejar al usuario buscándolo.
+    await expect(page.getByText(/equivalente por teclado/)).toBeVisible();
+  });
+});

@@ -64,8 +64,26 @@ SPEC §12.
 - `modelId` y `promptVersion` también en las de sistema (`reglas-sistema-1`),
   para que «la cola empeoró la semana pasada» siga siendo una pregunta con
   respuesta.
-- Queda para la siguiente tanda: el planificador de cobertura y las señales de
-  §4.4 que dependen de hitos posteriores.
+- **Planificador de cobertura**: personas en vertical, semanas en horizontal,
+  con lo comprometido, lo que se lleva una ausencia y lo que queda. La rejilla
+  se gana el sitio porque enseña lo que una lista no puede — quien está en dos
+  contratos al 60 % está sobreasignado sobre el papel mucho antes de que se
+  note en la calle.
+- Cada celda lleva color **y** texto. El estado no se codifica nunca sólo en
+  color, y esto lo audita cualquier comprador público.
+- La proyección es una multiplicación explicable, no un modelo: el porcentaje
+  de horas que este contrato perdió de verdad en los tres meses anteriores,
+  aplicado a lo planificado. Con menos de 160 horas de historia la pantalla
+  dice que no hay base suficiente en vez de imprimir una cifra sacada de una
+  semana suelta, que es la clase de número que acaba citándose en una reunión
+  como si significara algo.
+- **La rejilla se lee, no se arrastra.** El SPEC describe reasignar arrastrando;
+  eso debe una alternativa por teclado (WCAG 2.2 AA, 2.5.7) diseñada a la vez,
+  y entregar primero la mitad inaccesible habría sido entregar la mitad mala.
+  Las adscripciones se editan en el formulario que ya existe y la pantalla dice
+  por qué.
+- Queda para la siguiente tanda: reasignar arrastrando —con su equivalente por
+  teclado— y las señales de §4.4 que dependen de hitos posteriores.
 
 ## M11 — Personal, convenio y adscripción (completo, 2026-08-15)
 

@@ -150,6 +150,12 @@ export default async function PersonalPage({
           >
             Ausencias
           </Link>
+          <Link
+            className="rounded-md border border-border px-3 py-2 hover:bg-muted"
+            href={`/${orgSlug}/personal/planificador`}
+          >
+            Planificador
+          </Link>
         </nav>
       </header>
       <section
