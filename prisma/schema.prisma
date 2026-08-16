@@ -143,6 +143,7 @@ model Organisation {
   tiposCertificacion    TipoCertificacion[]
   certificaciones       CertificacionEmpleado[]
   ausencias             Ausencia[]
+  registroJornadas      RegistroJornada[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -2078,6 +2079,14 @@ enum TurnoTrabajo {
 
 /// Tipos de ausencia de SPEC §4.8. En español porque son los términos del
 /// parte de baja y del convenio.
+enum OrigenRegistroJornada {
+  TERMINAL_FICHAJE
+  APP_MOVIL
+  GEOLOCALIZACION
+  MANUAL
+  IMPORTADO
+}
+
 enum TipoAusencia {
   IT_CONTINGENCIA_COMUN
   IT_CONTINGENCIA_PROFESIONAL
@@ -2287,6 +2296,7 @@ model Empleado {
   certificaciones           CertificacionEmpleado[]
   ausencias                 Ausencia[]
   sustitucionesQueCubre     Ausencia[]              @relation("SustitucionAusencia")
+  registrosJornada          RegistroJornada[]
 
   @@unique([organisationId, numeroEmpleado])
   @@unique([organisationId, nifHash])
@@ -2337,6 +2347,64 @@ model PlantillaExigida {
 /// El diagnóstico NO se guarda. Es dato de salud del artículo 9 del RGPD y no
 /// hace falta para cubrir un turno: basta el tipo, las fechas y el número de
 /// parte.
+/// El registro diario de jornada (SPEC §4.9.5, M13).
+///
+/// Obligatorio desde el RD-ley 8/2019, y su ausencia es infracción grave que
+/// sanciona la ITSS. **Append-only y encadenado por hash**: un registro que el
+/// empresario puede editar no prueba nada, porque si una fila se puede
+/// reescribir en julio para decir lo que convenía en marzo, entonces ninguna
+/// fila vale como prueba, tampoco las honradas.
+///
+/// Corregir no es editar. Una corrección es un registro nuevo que apunta al
+/// anterior con `corrigeARegistroId`, la cadena sigue intacta y la historia
+/// enseña las dos cosas — que es justo lo que un inspector pide ver.
+model RegistroJornada {
+  id             String @id @default(cuid(2))
+  organisationId String
+  empleadoId     String
+
+  fecha       DateTime @db.Date
+  horaEntrada String?
+  horaSalida  String?
+  /// Array de `{desde, hasta}` en HH:MM. Las pausas no son tiempo trabajado.
+  pausas      Json     @default("[]")
+
+  horasOrdinarias Decimal @db.Decimal(5, 2)
+  horasExtra      Decimal @db.Decimal(5, 2)
+  /// De 22:00 a 06:00 (art. 36.1 ET).
+  horasNocturnas  Decimal @db.Decimal(5, 2)
+  horasFestivas   Decimal @db.Decimal(5, 2)
+
+  origen OrigenRegistroJornada @default(MANUAL)
+
+  validadoPorEmpleado      Boolean   @default(false)
+  validadoPorResponsableId String?
+  validadoEn               DateTime?
+
+  /// El sello de este registro y el del anterior de la misma persona. Alterar
+  /// cualquier campo sellado rompe éste y todos los siguientes.
+  hashIntegridad String
+  hashAnterior   String
+
+  /// Cuando este registro corrige a otro. El corregido no se toca.
+  corrigeARegistroId String?
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  empleado     Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  corrigeA     RegistroJornada?  @relation("CorreccionJornada", fields: [corrigeARegistroId], references: [id], onDelete: SetNull)
+  correcciones RegistroJornada[] @relation("CorreccionJornada")
+
+  /// Sin `updatedAt` ni `deletedAt`: el modelo es inmutable por diseño
+  /// (ADR 0003). Nada lo edita y nada lo borra.
+  @@unique([empleadoId, hashIntegridad])
+  @@index([organisationId, fecha])
+  @@index([organisationId, empleadoId, fecha])
+  @@map("registros_jornada")
+}
+
 model Ausencia {
   id             String @id @default(cuid(2))
   organisationId String

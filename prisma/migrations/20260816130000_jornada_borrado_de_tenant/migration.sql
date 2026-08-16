@@ -1,0 +1,22 @@
+-- M13: el registro de jornada no puede editarse, pero un tenant sí puede irse.
+--
+-- La migración anterior prohibía UPDATE y DELETE con un disparador. El DELETE
+-- era demasiado: al borrar una organización, el borrado en cascada llega a esta
+-- tabla y el disparador lo impedía, dejando imposible dar de baja a un cliente
+-- o atender un derecho de supresión. Un registro que no se puede borrar nunca
+-- no es un registro más probatorio, es un producto que no se puede desmontar.
+--
+-- Lo que queda, que es lo que sostiene el valor probatorio:
+--
+--   1. UPDATE sigue prohibido por disparador. Corregir es dar de alta otro
+--      registro; reescribir uno no es una opción para nadie.
+--   2. El rol de la aplicación no tiene permiso de DELETE, así que el código
+--      no puede borrar aunque quiera. Sólo el propietario del esquema puede,
+--      que es quien ejecuta la baja de un tenant.
+--   3. Y si alguien con ese acceso borrase una fila suelta, la cadena de hash
+--      lo delata: verificarCadena señala el punto exacto donde deja de cuadrar.
+--
+-- Es tamper-evidence, no tamper-proof, y así está dicho en el módulo de
+-- dominio. Anclar la cadena fuera del sistema es lo que daría lo segundo, y
+-- eso es un hito posterior.
+DROP TRIGGER IF EXISTS registros_jornada_sin_delete ON "registros_jornada";

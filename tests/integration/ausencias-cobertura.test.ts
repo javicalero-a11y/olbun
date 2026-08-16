@@ -4,6 +4,12 @@ import { randomUUID } from 'node:crypto';
 import { coberturaDeContrato, crearAusencia } from '@/lib/services/personal/ausencias';
 import { evaluarEstadoDelSistema } from '@/lib/services/detecciones/sistema';
 import { planificadorDeContrato } from '@/lib/services/personal/planificador';
+import {
+  bolsaAnual,
+  diasSinRegistro,
+  registrarJornada,
+  verificarJornadaDe,
+} from '@/lib/services/jornada/registro';
 import { crearAdscripcion, crearPlantillaExigida } from '@/lib/services/personal/adscripciones';
 import { crearCategoriaProfesional, crearConvenio } from '@/lib/services/personal/convenios';
 import { crearEmpleado } from '@/lib/services/personal/empleados-escritura';
@@ -346,6 +352,91 @@ describe('ausencias y cobertura real', () => {
     expect(plan.filas).toEqual([]);
     // Y no se inventa una proyección sobre cero horas.
     expect(plan.proyeccion.fiable).toBe(false);
+  });
+
+  it('la jornada se encadena y la cadena se puede verificar', async () => {
+    await tenantTransaction(organisationA, async (tx) => {
+      await registrarJornada(tx, organisationA, {
+        empleadoId,
+        fecha: f('2026-03-02'),
+        horaEntrada: '08:00',
+        horaSalida: '16:00',
+        pausas: [],
+        horasOrdinariasPactadas: 8,
+        esFestivo: false,
+        origen: 'TERMINAL_FICHAJE',
+        actorId: 'actor-prueba',
+      });
+
+      await registrarJornada(tx, organisationA, {
+        empleadoId,
+        fecha: f('2026-03-03'),
+        horaEntrada: '08:00',
+        horaSalida: '18:00',
+        pausas: [{ desde: '12:00', hasta: '12:30' }],
+        horasOrdinariasPactadas: 8,
+        esFestivo: false,
+        origen: 'TERMINAL_FICHAJE',
+        actorId: 'actor-prueba',
+      });
+    });
+
+    const verificacion = await tenantTransaction(organisationA, (tx) =>
+      verificarJornadaDe(tx, empleadoId),
+    );
+
+    expect(verificacion.intacta).toBe(true);
+    expect(verificacion.eslabones).toBe(2);
+  });
+
+  it('ni la aplicación ni nadie puede reescribir un registro de jornada', async () => {
+    // El valor probatorio depende de que no se pueda reescribir. «La
+    // aplicación no lo hace» no es una garantía enseñable a la ITSS: lo
+    // impiden un disparador y la falta de permiso, y las dos cosas se
+    // comprueban aquí porque la primera versión de esto no funcionaba —
+    // ALTER DEFAULT PRIVILEGES ya había concedido UPDATE y DELETE sobre
+    // cualquier tabla futura, así que conceder menos no quitaba nada.
+    const registro = await tenantTransaction(organisationA, (tx) =>
+      tx.registroJornada.findFirst({ select: { id: true } }),
+    );
+
+    await expect(
+      tenantTransaction(organisationA, (tx) =>
+        tx.registroJornada.update({
+          where: { id: registro?.id ?? '' },
+          data: { horasExtra: 99 },
+        }),
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      tenantTransaction(organisationA, (tx) =>
+        tx.registroJornada.delete({ where: { id: registro?.id ?? '' } }),
+      ),
+    ).rejects.toThrow();
+
+    // Y sigue ahí: el intento no se llevó nada por delante.
+    const despues = await tenantTransaction(organisationA, (tx) => tx.registroJornada.count());
+    expect(despues).toBe(2);
+  });
+
+  it('la bolsa anual suma las horas extra y avisa antes del límite', async () => {
+    // El 3 de marzo se trabajaron 9,5 h con 8 pactadas: 1,5 extra.
+    const resumen = await tenantTransaction(organisationA, (tx) =>
+      bolsaAnual(tx, empleadoId, 2026),
+    );
+
+    expect(resumen.horasExtraDelAnio).toBe(1.5);
+    expect(resumen.bolsa.estado).toBe('HOLGADA');
+    expect(resumen.bolsa.restantes).toBe(78.5);
+  });
+
+  it('los días sin registro son la infracción, y se listan', async () => {
+    const faltan = await tenantTransaction(organisationA, (tx) =>
+      diasSinRegistro(tx, empleadoId, [f('2026-03-02'), f('2026-03-03'), f('2026-03-04')]),
+    );
+
+    expect(faltan).toEqual(['2026-03-04']);
   });
 
   it('RLS no revela la ausencia a otro tenant aunque conozca el id', async () => {

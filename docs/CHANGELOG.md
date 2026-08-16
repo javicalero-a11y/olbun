@@ -11,6 +11,35 @@ All notable changes to Olbun are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); milestones map to
 SPEC §12.
 
+## M13 — Jornada (primera tanda, 2026-08-16)
+
+- **Registro diario de jornada, obligatorio desde el RD-ley 8/2019** y cuya
+  ausencia es infracción grave sancionable por la ITSS. Se graba con entrada,
+  salida, pausas y el desglose de ordinarias, extra, nocturnas y festivas.
+- **Append-only y encadenado por hash.** Un registro que el empresario puede
+  editar no prueba nada: si una fila se puede reescribir en julio para decir lo
+  que convenía en marzo, ninguna fila vale como prueba, tampoco las honradas.
+  Cada registro sella el anterior, y `verificarJornadaDe` recorre la cadena y
+  señala el punto exacto donde deja de cuadrar.
+- Corregir no es editar: una corrección es un registro nuevo que apunta al
+  anterior. La historia enseña las dos cosas, que es lo que un inspector pide.
+- Tres cosas lo sostienen, y conviene no confundirlas: un disparador que
+  rechaza todo UPDATE, la revocación explícita de UPDATE y DELETE al rol de la
+  aplicación, y la cadena, que delata lo que las dos anteriores no impidan.
+  **Es detección de manipulación, no imposibilidad de manipularla**, y así está
+  escrito en el código en vez de prometer de más.
+- Nocturnas son las de 22:00 a 06:00 (art. 36.1 ET), ni «tarde» ni «el turno de
+  noche». Un turno que cruza la medianoche se calcula entero y sin negativos, y
+  la pausa nocturna no cuenta como nocturna trabajada.
+- La jornada ordinaria la pone el contrato o el convenio, no una constante:
+  suponer cuarenta horas escondería horas extra de quien tiene jornada menor.
+- Bolsa anual de horas extra con el límite de 80 h del art. 35.2 ET, aviso al
+  70 % y exigencia de justificación a partir del límite.
+- Los días sin registro se listan aparte: la infracción no es sólo que las
+  horas estén mal, es que el registro no exista.
+- Queda para la siguiente tanda: importación desde terminales y apps, panel de
+  cumplimiento e informe ITSS.
+
 ## M12 — Absentismo y cobertura (primera tanda, 2026-08-15)
 
 - **Ausencias con los diecisiete tipos de SPEC §4.8**, de la IT al crédito
