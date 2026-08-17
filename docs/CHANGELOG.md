@@ -37,8 +37,15 @@ SPEC §12.
   70 % y exigencia de justificación a partir del límite.
 - Los días sin registro se listan aparte: la infracción no es sólo que las
   horas estén mal, es que el registro no exista.
-- Queda para la siguiente tanda: importación desde terminales y apps, panel de
-  cumplimiento e informe ITSS.
+- Pantalla de jornada: alta de un día con su desglose, bolsa anual de horas
+  extra con el porcentaje del límite, y **el botón que comprueba la cadena**.
+  Está junto al formulario a propósito: el registro sólo vale si se puede
+  demostrar que no se ha tocado, y esconder esa comprobación en una pantalla de
+  administración la convierte en algo que nadie ejecuta nunca.
+- La validación es la última oportunidad de parar una errata: como el registro
+  no se puede editar, un error obliga a grabar una corrección y quedan los dos.
+- Queda para la siguiente tanda: importación desde terminales y apps, e informe
+  ITSS.
 
 ## M12 — Absentismo y cobertura (primera tanda, 2026-08-15)
 

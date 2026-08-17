@@ -156,6 +156,12 @@ export default async function PersonalPage({
           >
             Planificador
           </Link>
+          <Link
+            className="rounded-md border border-border px-3 py-2 hover:bg-muted"
+            href={`/${orgSlug}/personal/jornada`}
+          >
+            Jornada
+          </Link>
         </nav>
       </header>
       <section
