@@ -301,3 +301,31 @@ test.describe('Conservación y purga', () => {
     await expect(sinPolitica.locator('dd')).toHaveText('1');
   });
 });
+
+test.describe('Bloqueo por litigio', () => {
+  test('bloquear exige un motivo y deja el documento fuera del alcance de la purga', async ({
+    page,
+  }) => {
+    const cred = await registrar(page);
+
+    await page.goto(`/${cred.slug}/documentos`);
+    await subir(page, 'requerimiento.txt', 'Requerimiento previo.', 'Requerimiento');
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Bloquear por litigio' }).click();
+
+    // Sin motivo no se bloquea: dentro de un año, «por qué es intocable este
+    // fichero» es la primera pregunta, y un booleano no la contesta.
+    await page.getByRole('button', { name: 'Bloquear', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Di por qué');
+
+    await page.getByLabel(/Por qué se bloquea/).fill('Recurso especial en tramitación');
+    await page.getByRole('button', { name: 'Bloquear', exact: true }).click();
+
+    await expect(page.getByText('Bloqueado por litigio').first()).toBeVisible();
+
+    // Y la pantalla de conservación lo cuenta aparte, no como caducable.
+    await page.goto(`/${cred.slug}/documentos/retencion`);
+    await expect(page.getByText(/bloqueado por litigio y no aparecen aquí/)).toBeVisible();
+  });
+});

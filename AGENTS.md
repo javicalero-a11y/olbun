@@ -6,13 +6,13 @@ build it and where we currently are.
 
 ## Current state
 
-|                           |                                                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Milestones complete**   | M0 Foundation · M1 Identity & tenancy · M2 Audit & shell (bar i18n) · M3 Deadline engine · M4 Contracts · M5 Expedientes, plazos & timeline |
-| **Milestone in progress** | M6 — Communications. Google, Microsoft and magic-link sign-in landed 2026-08-12.                                                            |
-| **Product**               | Olbun — Spanish public-sector contractors                                                                                                   |
-| **Spec**                  | `SPEC.md` (rewritten for Spain 2026-08-11; UK original at git `b1e9d5b`)                                                                    |
-| **Last updated**          | 2026-08-13                                                                                                                                  |
+|                           |                                                                                                                                                                                                                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Milestones complete**   | M0 Foundation · M1 Identity & tenancy · M2 Audit & shell (bar i18n) · M3 Deadline engine · M4 Contracts · M5 Expedientes, plazos & timeline · M7 AI detection · M10 Risks & incidents                                                                                                                 |
+| **Milestone in progress** | M9 — Documents & evidence. Storage, versioning, search, PDF and .docx indexing, zip export and the retention purge have landed; antivirus, OCR and a PDF index remain. M6 Communications is done bar a production mail transport; M8 mailboxes is blocked on the customer's Google/Entra credentials. |
+| **Product**               | Olbun — Spanish public-sector contractors                                                                                                                                                                                                                                                             |
+| **Spec**                  | `SPEC.md` (rewritten for Spain 2026-08-11; UK original at git `b1e9d5b`)                                                                                                                                                                                                                              |
+| **Last updated**          | 2026-08-14                                                                                                                                                                                                                                                                                            |
 
 ## Getting started
 

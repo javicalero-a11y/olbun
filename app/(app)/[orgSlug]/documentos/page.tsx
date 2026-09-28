@@ -3,6 +3,9 @@ import type { Metadata } from 'next';
 
 import { EstadoVacio, Tabla } from '@/components/ui/tabla';
 import { fragmentoAlrededor } from '@/lib/domain/documentos/texto';
+import { BloqueoLitigio } from '@/components/features/documentos/bloqueo-litigio';
+import { cambiarBloqueo } from './bloqueo';
+import { can } from '@/lib/auth/can';
 import { FormularioSubidaDocumento } from '@/components/features/documentos/formulario-subida';
 import { requirePermission } from '@/lib/auth/guardias';
 import { subir } from './acciones';
@@ -49,6 +52,7 @@ export default async function DocumentosPage({
   const consulta = q?.trim() ?? '';
   const contexto = await requirePermission(orgSlug, 'documento:view');
   const db = tenantClient(contexto.organisation.id);
+  const puedeBorrar = can(contexto.actor, 'documento:delete');
 
   const [documentos, tipos, expedientes] = await Promise.all([
     db.documento.findMany({
@@ -255,12 +259,25 @@ export default async function DocumentosPage({
           {
             clave: 'retencion',
             encabezado: 'Conservación',
-            clase: 'text-xs text-muted-foreground',
-            celda: (documento) => {
-              if (documento.bloqueadoPorLitigio) return 'Bloqueado por litigio';
-              const anios = documento.tipo?.retencionAnios;
-              return anios == null ? 'Sin política' : `${String(anios)} años`;
-            },
+            clase: 'text-xs text-muted-foreground align-top',
+            celda: (documento) => (
+              <div className="space-y-1">
+                <BloqueoLitigio
+                  documentoId={documento.id}
+                  nombre={documento.nombre}
+                  bloqueado={documento.bloqueadoPorLitigio}
+                  puedeLevantar={puedeBorrar}
+                  accion={cambiarBloqueo.bind(null, orgSlug)}
+                />
+                {documento.bloqueadoPorLitigio ? null : (
+                  <p>
+                    {documento.tipo?.retencionAnios == null
+                      ? 'Sin política'
+                      : `${String(documento.tipo.retencionAnios)} años`}
+                  </p>
+                )}
+              </div>
+            ),
           },
           {
             clave: 'tamano',
